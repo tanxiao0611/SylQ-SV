@@ -10,7 +10,10 @@ from pyverilog.vparser.ast import Concat, BlockingSubstitution, Parameter, Strin
 from helpers.utils import init_symbol
 from helpers.slang_helpers import SlangSymbolVisitor, SlangNodeVisitor
 from typing import Optional
+import pkg_resources
+pkg_resources.require("pyslang==3.0.310")
 import pyslang as ps
+assert ps.__version__ == "3.0.310"
 
 
 CONDITIONALS = (IfStatement, ForStatement, WhileStatement, CaseStatement)
@@ -139,18 +142,32 @@ class ExecutionManager:
         if self.sv:
             driver = ps.Driver()
             driver.addStandardArgs()
-            driver.processCommandFile("designs/test-designs/updowncounter.v", makeRelative=True)
+            driver.processCommandFiles("flist.txt", True)
             driver.processOptions()
             driver.parseAllSources()
             
             compilation = driver.createCompilation()
             successful_compilation = driver.reportCompilation(compilation, False)
             if successful_compilation:
-                # logging.debug(f"Number of syntax trees: {len(self.driver.syntaxTrees)}")
+                print(dir(driver))
+                print(driver.reportMacros())
+                print(f"Number of syntax trees: {len(driver.syntaxTrees)}")
                 tree = driver.syntaxTrees[0]
                 print("here!")
-            vis1 = SlangSymbolVisitor()
-            compilation.getRoot().visit(SlangSymbolVisitor.visit)
+            
+            my_visitor_for_symbol = SlangSymbolVisitor()
+            compilation.getRoot().visit(my_visitor_for_symbol.visit)
+        
+        
+            global_module_to_port_to_direction = dict()
+            for i, curr_syntax_tree in enumerate(compilation.getSyntaxTrees()):
+                my_visitor_for_node = SlangNodeVisitor(my_visitor_for_symbol)
+                my_visitor_for_node.traverse_tree(curr_syntax_tree.root)
+                #my_visitor_for_node.build_module_to_port_to_direction(global_module_to_port_to_direction)
+            print(global_module_to_port_to_direction)
+            print("done traversal")
+            #my_visitor_for_node.traverse_tree(curr_syntax_tree.root)
+            #compilation.getRoot().visit(vis2.visit)
             exit()
             visitor = SlangNodeVisitor()
             visitor.traverse_tree(ast.root)
