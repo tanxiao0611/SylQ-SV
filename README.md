@@ -46,7 +46,7 @@ Requirements
 ## Quick Start
 
 1. Install dependencies above.
-2. Set up result directories.
+2. Set up result directories:
 
 ```make init```
 
