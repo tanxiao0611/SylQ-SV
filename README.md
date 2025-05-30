@@ -32,7 +32,7 @@ Requirements
 * matplotlib: run `python3 -m pip install matplotlib`
 
 ### Directory Structure
-
+```
 ├── designs/                # RTL benchmark designs (e.g., OR1200, Hack@DAC, OpenTitan)
 ├── results/                # Output from all experiments (auto-generated)
 ├── scripts/                # Individual bash scripts 
@@ -40,6 +40,7 @@ Requirements
 ├── cache_analysis.py       # Script to analyze Redis SMT query cache
 ├── Makefile                # Automates experiment runs
 └── README.md               # You're here
+```
 
 
 ## Quick Start
