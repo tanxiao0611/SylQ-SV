@@ -58,6 +58,9 @@ To run the experiment, execute the following command:
 
 `python3 -m main 1 designs/benchmarks/buggy-or1200/or1200.F --use_cache=true --explore_time=300> out.txt`
 
+The expected output for the kick-the-tires test is a summary of the number
+of paths and branch points visited. The number of paths and branch points explored will vary based on your environment, but we saw around 50,000 paths exploredand 8,100 branch points explored. 
+
 ## Run experiments
 
 1. 24-hour end-to-end symbolic exploration (w/ and w/o cache):
