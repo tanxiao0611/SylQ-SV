@@ -1,3 +1,6 @@
 [submodule "designs/benchmarks"]
 	path = designs/benchmarks
 	url = git@github.com:HWSec-UNC/verification-benchmarks.git
+[submodule "designs/ibex"]
+	path = designs/ibex
+	url = https://github.com/lowRISC/ibex.git
