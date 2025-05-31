@@ -43,14 +43,22 @@ Requirements
 ```
 
 
-## Quick Start
+## Getting Started
 
 1. Install dependencies above.
 2. Set up result directories:
 
 ```make init```
 
-3. Run experiments.
+## Kick-the Tires
+
+Goal: Run SylQ-SV on the OR1200 for 1 clock cycle for 5 minutes with query caching enabled, and inspect the number of symbolic paths and solver queries generated.
+
+To run the experiment, execute the following command:
+
+`python3 -m main 1 designs/benchmarks/buggy-or1200/or1200.F --use_cache=true --explore_time=300> out.txt`
+
+## Run experiments
 
 * 24-hour end-to-end symbolic exploration (w/ and w/o cache):
 
@@ -76,7 +84,7 @@ Requirements
 
 * All experiments write results to the `results/<design>/<experiment_type>/out.txt` file.
 * To run a single experiment manually, use:
-`python3 -m main 1 designs/<design>/<top_module>.v --use_cache=true > out.txt`
+`python3 -m main 1 designs/<design>/<top_module>.sv --use_cache=true > out.txt`
 * For assertion checking, embed SVA assertions directly into the top-level module of your RTL design.
 * The Redis cache file (`cache.rdb`) is persistent across runs and used to analyze query reuse.
 
