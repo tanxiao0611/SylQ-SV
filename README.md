@@ -60,23 +60,23 @@ To run the experiment, execute the following command:
 
 ## Run experiments
 
-* 24-hour end-to-end symbolic exploration (w/ and w/o cache):
+1. 24-hour end-to-end symbolic exploration (w/ and w/o cache):
 
 ```make explore```
 
-* Assertion violation checks (for OR1200 and Hack@DAC SoCs):
+2. Assertion violation checks (for OR1200 and Hack@DAC SoCs):
 
 ```make assert-check```
 
-* Assertion checking with merge queries enabled:
+3. Assertion checking with merge queries enabled:
 
 ```make merge-queries```
 
-* 1-hour symbolic execution comparison with and without caching:
+4. 1-hour symbolic execution comparison with and without caching:
 
 ```make cache-compare```
 
-* Analyze persistent Redis SMT query cache:
+5. Analyze persistent Redis SMT query cache:
 
 ```make analyze-cache```
 
