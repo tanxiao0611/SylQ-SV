@@ -10,10 +10,10 @@ from pyverilog.vparser.ast import Concat, BlockingSubstitution, Parameter, Strin
 from helpers.utils import init_symbol
 from helpers.slang_helpers import SlangSymbolVisitor, SlangNodeVisitor
 from typing import Optional
-import pkg_resources
-pkg_resources.require("pyslang==3.0.310")
+# import pkg_resources
+# pkg_resources.require("pyslang==3.0.310")
 import pyslang as ps
-assert ps.__version__ == "3.0.310"
+#assert ps.__version__ == "3.0.310"
 
 
 CONDITIONALS = (IfStatement, ForStatement, WhileStatement, CaseStatement)

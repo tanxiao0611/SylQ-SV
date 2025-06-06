@@ -29,6 +29,9 @@ from pyverilog.dataflow.optimizer import VerilogDataflowOptimizer
 from pyverilog.dataflow.graphgen import VerilogGraphGenerator
 import pygraphviz as pgv
 import pyslang
+import redis
+import threading
+import time
 
 gc.collect()
 
@@ -42,6 +45,10 @@ INFO = "Verilog Symbolic Execution Engine"
 VERSION = pyverilog.__version__
 USAGE = "Usage: python3 -m main <num_cycles> <verilog_file>.v > out.txt"
     
+def timeout_exit():
+    """This only happens when the timer runs out."""
+    print("Execution time limit exceeded. Exiting.")
+    sys.exit(1)
 
 def showVersion():
     print(INFO)
@@ -83,6 +90,9 @@ def main():
                          default=False, help="Reorder the contineous tree, Default=False")
     optparser.add_option("--delay", action="store_true", dest="delay",
                          default=False, help="Inset Delay Node to walk Regs, Default=False")
+    optparser.add_option("--use_cache", action="store_true", dest="use_cache",
+                         default=False, help="Use the query caching, Default=True")
+    optparser.add_option("--explore_time", help="Time to explore in seconds", dest="explore_time")
     (options, args) = optparser.parse_args()
 
 
@@ -91,6 +101,14 @@ def main():
 
     if options.showversion:
         showVersion()
+    
+    if options.use_cache:
+        engine.cache = redis.Redis(host='localhost', port=6379, db=0)
+
+    timer = None
+    if options.explore_time:
+        timer = threading.Timer(int(options.explore_time), timeout_exit)
+        timer.start()
 
     if options.showdebug:
         engine.debug = True
@@ -113,6 +131,8 @@ def main():
         engine.execute_sv(top_level_module, modules, None, num_cycles)
         end = time.process_time()
         print(f"Elapsed time {end - start}")
+        if timer:
+            timer.cancel()
         exit()
 
         # for item in tree.root.members:
