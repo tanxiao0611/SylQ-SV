@@ -56,7 +56,7 @@ Goal: Run SylQ-SV on the OR1200 for 1 clock cycle for 5 minutes with query cachi
 
 To run the experiment, execute the following command:
 
-`python3 -m main 1 designs/benchmarks/buggy-or1200/or1200.F --use_cache=true --explore_time=300> out.txt`
+`python3 -m main 1 designs/benchmarks/buggy-or1200/or1200.F --use_cache --explore_time=300> out.txt`
 
 The expected output for the kick-the-tires test is a summary of the number
 of paths and branch points visited. The number of paths and branch points explored will vary based on your environment, but we saw around 50,000 paths exploredand 8,100 branch points explored. 
