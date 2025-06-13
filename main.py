@@ -91,7 +91,7 @@ def main():
     optparser.add_option("--delay", action="store_true", dest="delay",
                          default=False, help="Inset Delay Node to walk Regs, Default=False")
     optparser.add_option("--use_cache", action="store_true", dest="use_cache",
-                         default=False, help="Use the query caching, Default=True")
+                         default=False, help="Use the query caching, Default=False")
     optparser.add_option("--explore_time", help="Time to explore in seconds", dest="explore_time")
     (options, args) = optparser.parse_args()
 
