@@ -316,7 +316,6 @@ class ExecutionEngine:
     def module_count_sv(self, m: ExecutionManager, items) -> None:
         """Traverse a top level module and count up the instances of each type of module
         for SystemVerilog."""
-        print(len(items))
         # TODO need to figure out what the node type is for instances
         # TODO do this check for the other block types
         if items.__class__.__name__ == "ProceduralBlockSyntax":
@@ -562,7 +561,6 @@ class ExecutionEngine:
 
     def execute_sv(self, ast, modules, manager: Optional[ExecutionManager], num_cycles: int) -> None:
         """Drives symbolic execution for SystemVerilog designs."""
-        print("yeehaw")
         gc.collect()
         print(f"Executing for {num_cycles} clock cycles")
         self.module_depth += 1
@@ -685,15 +683,13 @@ class ExecutionEngine:
                 curr_cfg += 1
             curr_cfg = 0
 
-        print(mapped_paths)
-
         stride_length = cfg_count
         single_paths_by_module = {}
         total_paths_by_module = {}
         for module_name in cfgs_by_module:
             single_paths_by_module[module_name] = list(product(*mapped_paths[module_name].values()))
             total_paths_by_module[module_name] = list(tuple(product(single_paths_by_module[module_name], repeat=int(num_cycles))))
-        print(f"tp {total_paths_by_module}")
+        # {total_paths_by_module}")
         keys, values = zip(*total_paths_by_module.items())
         total_paths = [dict(zip(keys, path)) for path in product(*values)]
         #print(total_paths)
@@ -936,7 +932,7 @@ class ExecutionEngine:
         for module_name in cfgs_by_module:
             single_paths_by_module[module_name] = list(product(*mapped_paths[module_name].values()))
             total_paths_by_module[module_name] = list(tuple(product(single_paths_by_module[module_name], repeat=int(num_cycles))))
-        print(f"tp {total_paths_by_module}")
+        #print(f"tp {total_paths_by_module}")
         keys, values = zip(*total_paths_by_module.items())
         total_paths = [dict(zip(keys, path)) for path in product(*values)]
         #print(total_paths)

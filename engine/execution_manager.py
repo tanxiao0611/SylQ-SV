@@ -142,18 +142,16 @@ class ExecutionManager:
         if self.sv:
             driver = ps.Driver()
             driver.addStandardArgs()
-            driver.processCommandFiles("flist.txt", True)
+            driver.processCommandFiles("designs/benchmarks/or1200/or1200.f", True, True)
             driver.processOptions()
             driver.parseAllSources()
             
             compilation = driver.createCompilation()
             successful_compilation = driver.reportCompilation(compilation, False)
             if successful_compilation:
-                print(dir(driver))
-                print(driver.reportMacros())
+                #print(driver.reportMacros())
                 print(f"Number of syntax trees: {len(driver.syntaxTrees)}")
                 tree = driver.syntaxTrees[0]
-                print("here!")
             
             my_visitor_for_symbol = SlangSymbolVisitor()
             compilation.getRoot().visit(my_visitor_for_symbol.visit)
@@ -161,10 +159,10 @@ class ExecutionManager:
         
             global_module_to_port_to_direction = dict()
             for i, curr_syntax_tree in enumerate(compilation.getSyntaxTrees()):
-                my_visitor_for_node = SlangNodeVisitor(my_visitor_for_symbol)
-                my_visitor_for_node.traverse_tree(curr_syntax_tree.root)
+                ...
+                # my_visitor_for_node = SlangNodeVisitor(my_visitor_for_symbol)
+                # my_visitor_for_node.traverse_tree(curr_syntax_tree.root)
                 #my_visitor_for_node.build_module_to_port_to_direction(global_module_to_port_to_direction)
-            print(global_module_to_port_to_direction)
             print("done traversal")
             #my_visitor_for_node.traverse_tree(curr_syntax_tree.root)
             #compilation.getRoot().visit(vis2.visit)

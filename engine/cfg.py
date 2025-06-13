@@ -122,8 +122,8 @@ class CFG:
         if hasattr(ast, '__iter__'):
             for item in ast:
                 #print(f"item ! {item.kind} {dir(item)}")
-                print(f"kind of item !! {item.kind}")
-                print((item.__class__.__name__))
+                # print(f"kind of item !! {item.kind}")
+                # print((item.__class__.__name__))
                 if ast.__class__.__name__ == "ConditionalStatementSyntax":
                     print("found if statement")
                     print(dir(item))
@@ -312,7 +312,7 @@ class CFG:
             elif isinstance(ast, Block):
                 self.block_stmt_depth += 1
                 self.block_smt.append(True)
-                print("found other block statement")
+                #print("found other block statement")
                 self.basic_blocks(m, s, ast.statements)
                 if self.block_stmt_depth in self.ind_branch_points:
                     self.resolve_independent_branch_pts(self.block_stmt_depth)

@@ -112,7 +112,8 @@ def main():
 
     if options.showdebug:
         engine.debug = True
-    
+
+
     for f in filelist:
         if not os.path.exists(f):
             raise IOError("file not found: " + f)
@@ -124,7 +125,7 @@ def main():
         tree = pyslang.SyntaxTree.fromFile('designs/test-designs/updowncounter.v')
         print(f"total number of modules defined in this file {len(tree.root.members)}")
         top_level_module = tree.root.members[0]
-        print(top_level_module.header)
+        #print(top_level_module.header)
         header = top_level_module.header
         modules = tree.root.members
         start = time.process_time()
