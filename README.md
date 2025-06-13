@@ -23,7 +23,7 @@ Requirements
 
     `sudo apt-get update`
 
-    `sudo apt-get install redis`
+* redis: run `python3 -m pip install redis`
 * z3: run `python3 -m pip install z3-solver`
 * Icarus Verilog: 10.1 or later: run `sudo apt install iverilog`
 * Jinja 2.10 or later: run `python3 -m pip install jinja2`
