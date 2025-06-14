@@ -18,10 +18,10 @@ import gc
 from itertools import product
 import logging
 from helpers.utils import to_binary
-from helpers.slang_helpers import get_module_name
 from strategies.dfs import DepthFirst
 import sys
 from copy import deepcopy
+from helpers.slang_helpers import get_module_name, init_state
 
 CONDITIONALS = (IfStatement, ForStatement, WhileStatement, CaseStatement)
 
@@ -408,20 +408,6 @@ class ExecutionEngine:
                 for i in range(manager.child_num_paths[child]):
                     manager.seen_mod[child][(to_binary(i))] = {}
 
-    def merge_states(self, manager: ExecutionManager, state: SymbolicState, store):
-        """Merges two states."""
-        for key, val in state.store.items():
-            if type(val) != dict:
-                continue
-            else:
-                for key2, var in val.items():
-                    if var in store.values():
-                        prev_symbol = state.store[key][key2]
-                        new_symbol = store[key][key2]
-                        state.store[key][key2].replace(prev_symbol, new_symbol)
-                    else:
-                        state.store[key][key2] = store[key][key2]
-
     def piece_wise_execute(self, ast: ModuleDef, manager: Optional[ExecutionManager], modules) -> None:
         """Drives symbolic execution piecewise when number of paths is too large not to breakup. 
         We break it up to avoid the memory blow up."""
@@ -496,7 +482,7 @@ class ExecutionEngine:
 
                 manager.path_code = paths[i][0]
                 manager.prev_store = state.store
-                manager.init_state(state, manager.prev_store, ast)
+                init_state(state, manager.prev_store, ast)
                 self.search_strategy.visit_module(manager, state, ast, modules_dict)
                 manager.cycle += 1
                 manager.curr_level = 0
@@ -559,7 +545,7 @@ class ExecutionEngine:
                 for j in range(len(paths[i])):
                     manager.config[manager.names_list[j]] = paths[i][j]
 
-    def execute_sv(self, ast, modules, manager: Optional[ExecutionManager], num_cycles: int) -> None:
+    def execute_sv(self, visitor, modules, manager: Optional[ExecutionManager], num_cycles: int) -> None:
         """Drives symbolic execution for SystemVerilog designs."""
         gc.collect()
         print(f"Executing for {num_cycles} clock cycles")
@@ -567,6 +553,7 @@ class ExecutionEngine:
         state: SymbolicState = SymbolicState()
         if manager is None:
             manager: ExecutionManager = ExecutionManager()
+            manager.cache = self.cache
             manager.sv = True
             manager.debugging = False
             modules_dict = {}
@@ -575,13 +562,14 @@ class ExecutionEngine:
             cfg_count_by_module = {}
             for module in modules:
                 sv_module_name = get_module_name(module)
+                #print(sv_module_name)
                 modules_dict[sv_module_name] = sv_module_name
                 always_blocks_by_module = {sv_module_name: []}
                 manager.seen_mod[sv_module_name] = {}
                 cfgs_by_module[sv_module_name] = []
                 sub_manager = ExecutionManager()
                 self.init_run(sub_manager, module)
-                self.module_count_sv(manager, module.members) 
+                self.module_count_sv(manager, module) 
                 if sv_module_name in manager.instance_count:
                     manager.instances_seen[sv_module_name] = 0
                     manager.instances_loc[sv_module_name] = ""
@@ -619,7 +607,7 @@ class ExecutionEngine:
                     cfg = CFG()
                     cfg.all_nodes = []
                     #cfg.partition_points = []
-                    cfg.get_always_sv(manager, state, ast.members)
+                    cfg.get_always_sv(manager, state, module)
                     cfg_count = len(cfg.always_blocks)
                     always_blocks_by_module[sv_module_name] = deepcopy(cfg.always_blocks)
                     for k in range(cfg_count):
@@ -661,8 +649,10 @@ class ExecutionEngine:
             manager.modules = modules_dict
 
             mapped_paths = {}
+            
             #print(total_paths)
 
+        print(f"Branch points explored: {manager.branch_count}")
         if self.debug:
             manager.debug = True
         self.assertions_always_intersect(manager)
@@ -701,18 +691,22 @@ class ExecutionEngine:
 
         for i in range(len(total_paths)):
             manager.prev_store = state.store
-            manager.init_state(state, manager.prev_store, ast)
+            init_state(state, manager.prev_store, module, visitor)
             # initalize inputs with symbols for all submodules too
             for module_name in manager.names_list:
                 manager.curr_module = module_name
                 # actually want to terminate this part after the decl and comb part
-                self.search_strategy.visit_module(manager, state, ast, modules_dict)
+                #compilation.getRoot().visit(my_visitor_for_symbol.visit)
+                visitor.dfs(modules_dict[module_name])
+                #self.search_strategy.visit_module(manager, state, ast, modules_dict)
                 
             for cfg_idx in range(cfg_count):
                 for node in cfgs_by_module[manager.curr_module][cfg_idx].decls:
-                    self.search_strategy.visit_stmt(manager, state, node, modules_dict, None)
+                    visitor.dfs(node)
+                    #self.search_strategy.visit_stmt(manager, state, node, modules_dict, None)
                 for node in cfgs_by_module[manager.curr_module][cfg_idx].comb:
-                    self.search_strategy.visit_stmt(manager, state, node, modules_dict, None) 
+                    visitor.dfs(node)
+                    #self.search_strategy.visit_stmt(manager, state, node, modules_dict, None) 
    
             manager.curr_module = manager.names_list[0]
             # makes assumption top level module is first in line
@@ -722,7 +716,6 @@ class ExecutionEngine:
             self.check_state(manager, state)
 
             curr_path = total_paths[i]
-
             modules_seen = 0
             for module_name in curr_path:
                 manager.curr_module = manager.names_list[modules_seen]
@@ -743,9 +736,9 @@ class ExecutionEngine:
                                     # print(f"updating curr mod {manager.curr_module}")
                                     #self.check_state(manager, state)
                                     self.search_strategy.visit_stmt(manager, state, stmt, modules_dict, direction)
-                                            # only do once, and the last CFG 
-                    for node in cfgs_by_module[module_name][cfg_count-1].comb:
-                        self.search_strategy.visit_stmt(manager, state, node, modules_dict, None)  
+                    # only do once, and the last CFG 
+                    #for node in cfgs_by_module[module_name][complete_single_cycle_path.index(cfg_path)].comb:
+                        #self.search_strategy.visit_stmt(manager, state, node, modules_dict, None)  
                     manager.cycle += 1
                 modules_seen += 1
             manager.cycle = 0
@@ -944,7 +937,7 @@ class ExecutionEngine:
 
         for i in range(len(total_paths)):
             manager.prev_store = state.store
-            manager.init_state(state, manager.prev_store, ast)
+            init_state(state, manager.prev_store, ast)
             # initalize inputs with symbols for all submodules too
             for module_name in manager.names_list:
                 manager.curr_module = module_name

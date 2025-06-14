@@ -1,431 +1,500 @@
 """A library of helper functions for working with the PySlang AST."""
 import pyslang as ps
+from helpers.utils import init_symbol
+from engine.execution_manager import ExecutionManager
+from engine.symbolic_state import SymbolicState
+
+def init_state(s: SymbolicState, prev_store, ast, symbol_visitor):
+    """give fresh symbols and merge register values in."""
+    params = {}
+    ports = {}
+    global_module_to_port_to_direction = dict()
+    # driver = ps.Driver()
+    # compilation = driver.createCompilation()
+    expr_symbol_visitor = ExpressionSymbolCollector()
+    symbol_visitor.dfs(ast)
+    params = expr_symbol_visitor.parameters
+    port_list = expr_symbol_visitor.ports
+    for i, token in enumerate(port_list):
+        port = extract_kinds_from_descendants(token, desired_kinds=[ps.SyntaxKind.ImplicitAnsiPort])
+        port_list.append(port)
+
+    for param in params:
+        if isinstance(param.list[0], Parameter):
+            if param.list[0].name != "clk" and param.list[0].name != "rst":
+                s.store[self.curr_module][param.list[0].name] = init_symbol()
+
+    for port in ports:
+        if isinstance(port, Ioport):
+            if str(port.first.name) != "clk" and str(port.first.name) != "rst":
+                s.store[self.curr_module][str(port.first.name)] = init_symbol()
+        else:
+            if port.name not in s.store[self.curr_module]:
+                s.store[self.curr_module][port.name] = init_symbol()
+
+    merge_states(s, prev_store)
+
+def merge_states(state: SymbolicState, store):
+    """Merges two states."""
+    for key, val in state.store.items():
+        if type(val) != dict:
+            continue
+        else:
+            for key2, var in val.items():
+                if var in store.values():
+                    prev_symbol = state.store[key][key2]
+                    new_symbol = store[key][key2]
+                    state.store[key][key2].replace(prev_symbol, new_symbol)
+                else:
+                    state.store[key][key2] = store[key][key2]
 
 def get_module_name(module) -> str:
     """From module syntax object return the module name."""
-    return module.header.name.value
+    return module.name
 
 class SlangSymbolVisitor:
     """Visits a Slang AST by each Symbol."""
 
-    def __init__(self):
+    def __init__(self, cycles):
         self.symbol_id_to_symbol = dict()
         self.sourceRange_to_symbol_id = dict()
         self.kind_to_symbol_id = dict()
 
         self.symbol_id = 0
-    
-    def visit_expr(self, expr):
-        """Visit the expressions in the symbol tree."""
-        if expr.kind == ps.ExpressionKind.Invalid:
-            print("invalid expression")
-        elif expr.kind == ps.ExpressionKind.IntegerLiteral:
-            print("integerliteral expression")
-        elif expr.kind == ps.ExpressionKind.RealLiteral:
-            print("realliteral expression")
-        elif expr.kind == ps.ExpressionKind.TimeLiteral:
-            print("timeliteral expression")
-        elif expr.kind == ps.ExpressionKind.UnbasedUnsizedIntegerLiteral:
-            print("unbasedunsizedintegerliteral expression")
-        elif expr.kind == ps.ExpressionKind.NullLiteral:
-            print("nullliteral expression")
-        elif expr.kind == ps.ExpressionKind.UnboundedLiteral:
-            print("unboundedliteral expression")
-        elif expr.kind == ps.ExpressionKind.StringLiteral:
-            print("stringliteral expression")
-        elif expr.kind == ps.ExpressionKind.NamedValue:
-            # TODO: should have a flag that checks if in conditional
-            # copy from Sylvia.
-            print("namedvalue expression")
-            expr_name = expr.symbol
-            expr_width = expr.effectiveWidth
-        elif expr.kind == ps.ExpressionKind.HierarchicalValue:
-            print("hierarchicalvalue expression")
-        elif expr.kind == ps.ExpressionKind.UnaryOp:
-            print("unaryop expression")
-        elif expr.kind == ps.ExpressionKind.BinaryOp:
-            print("binaryop expression")
-            op = expr.op
-            lvalue = expr.left
-            #TODO: lvalues should just return the symbol str into the symbolic state
-            # the binary op should be checked in the other place if not null
-            self.visit_expr(lvalue)
-
-            rvalue = expr.right
-            self.visit_expr(rvalue)
-        elif expr.kind == ps.ExpressionKind.ConditionalOp:
-            print("conditionalop expression")
-        elif expr.kind == ps.ExpressionKind.Inside:
-            print("inside expression")
-        elif expr.kind == ps.ExpressionKind.Assignment:
-            print("assignment expression")
-            nonblocking = expr.isNonBlocking
-            #TODO: when is op not null?
-            op = expr.op
-            lvalue = expr.left
-            self.visit_expr(lvalue)
-
-            rvalue = expr.right
-            self.visit_expr(rvalue)
-        elif expr.kind == ps.ExpressionKind.Concatenation:
-            print("concatenation expression")
-        elif expr.kind == ps.ExpressionKind.Replication:
-            print("replication expression")
-        elif expr.kind == ps.ExpressionKind.Streaming:
-            print("streaming expression")
-        elif expr.kind == ps.ExpressionKind.ElementSelect:
-            print("elementselect expression")
-        elif expr.kind == ps.ExpressionKind.RangeSelect:
-            print("rangeselect expression")
-        elif expr.kind == ps.ExpressionKind.MemberAccess:
-            print("memberaccess expression")
-        elif expr.kind == ps.ExpressionKind.Call:
-            print("call expression")
-        elif expr.kind == ps.ExpressionKind.Conversion:
-            print("conversion expression")
-            # implicit or explicit or other options
-            conversion_kind = expr.conversionKind
-        elif expr.kind == ps.ExpressionKind.DataType:
-            print("datatype expression")
-        elif expr.kind == ps.ExpressionKind.TypeReference:
-            print("typereference expression")
-        elif expr.kind == ps.ExpressionKind.ArbitrarySymbol:
-            print("arbitrarysymbol expression")
-        elif expr.kind == ps.ExpressionKind.LValueReference:
-            print("lvaluereference expression")
-        elif expr.kind == ps.ExpressionKind.SimpleAssignmentPattern:
-            print("simpleassignmentpattern expression")
-        elif expr.kind == ps.ExpressionKind.StructuredAssignmentPattern:
-            print("structuredassignmentpattern expression")
-        elif expr.kind == ps.ExpressionKind.ReplicatedAssignmentPattern:
-            print("replicatedassignmentpattern expression")
-        elif expr.kind == ps.ExpressionKind.EmptyArgument:
-            print("emptyargument expression")
-        elif expr.kind == ps.ExpressionKind.ValueRange:
-            print("valuerange expression")
-        elif expr.kind == ps.ExpressionKind.Dist:
-            print("dist expression")
-        elif expr.kind == ps.ExpressionKind.NewArray:
-            print("newarray expression")
-        elif expr.kind == ps.ExpressionKind.NewClass:
-            print("newclass expression")
-        elif expr.kind == ps.ExpressionKind.NewCovergroup:
-            print("newcovergroup expression")
-        elif expr.kind == ps.ExpressionKind.CopyClass:
-            print("copyclass expression")
-        elif expr.kind == ps.ExpressionKind.MinTypMax:
-            print("mintypmax expression")
-        elif expr.kind == ps.ExpressionKind.ClockingEvent:
-            print("clockingevent expression")
-        elif expr.kind == ps.ExpressionKind.AssertionInstance:
-            print("assertioninstance expression")
-        elif expr.kind == ps.ExpressionKind.TaggedUnion:
-            print("taggedunion expression")
+        self.branch_points = 0
+        self.paths = 0
     
     def visit_stmt(self, stmt):
-        """Visit the statements in the symbol tree."""
         if stmt is None:
-            print("Stmt is None")
+            self.paths += 1
             return
-        if stmt.kind == ps.StatementKind.Invalid:
-            print("invalid statement")
-        elif stmt.kind == ps.StatementKind.Empty:
-            print("empty statement")
-        elif stmt.kind == ps.StatementKind.List:
-            print("list statement")
-        elif stmt.kind == ps.StatementKind.Block:
-            print("block statement")
 
-            # block kind is either sequential, joinone, joinany, or none
-            block_kind = stmt.blockKind
-            body = stmt.body
-            self.visit_stmt(body)
-        elif stmt.kind == ps.StatementKind.ExpressionStatement:
-            print("expressionstatement statement")
-            expr = stmt.expr
-            self.visit_expr(expr)
-        elif stmt.kind == ps.StatementKind.VariableDeclaration:
-            print("variabledeclaration statement")
-        elif stmt.kind == ps.StatementKind.Return:
-            print("return statement")
-        elif stmt.kind == ps.StatementKind.Continue:
-            print("continue statement")
-        elif stmt.kind == ps.StatementKind.Break:
-            print("break statement")
-        elif stmt.kind == ps.StatementKind.Disable:
-            print("disable statement")
-        elif stmt.kind == ps.StatementKind.Conditional:
-            print("conditional statement")
-            if len(stmt.conditions) > 1:
-                #TODO: handle multiple conditions
-                print("multiple conditions in conditional statement")
-            expr = stmt.Condition.expr.__get__(stmt.conditions[0])
-            self.visit_expr(expr)
+        kind = stmt.kind
 
-            then_block = stmt.ifTrue
-            else_block = stmt.ifFalse
+        if kind == ps.StatementKind.Conditional:
+            self.branch_points += 1
+            if stmt.conditions:
+                for cond in stmt.conditions:
+                    self.visit_expr(cond.expr)
+            if stmt.ifTrue:
+                self.visit_stmt(stmt.ifTrue)
+            else:
+                self.paths += 1
+            if stmt.ifFalse:
+                self.visit_stmt(stmt.ifFalse)
+            else:
+                self.paths += 1
 
-            if not then_block is None:
-                self.visit_stmt(then_block)
-            
-            if not else_block is None:
-                self.visit_stmt(else_block)
-        elif stmt.kind == ps.StatementKind.Case:
-            print("case statement")
-        elif stmt.kind == ps.StatementKind.PatternCase:
-            print("patterncase statement")
-        elif stmt.kind == ps.StatementKind.ForLoop:
-            print("forloop statement")
-        elif stmt.kind == ps.StatementKind.RepeatLoop:
-            print("repeatloop statement")
-        elif stmt.kind == ps.StatementKind.ForeachLoop:
-            print("foreachloop statement")
-        elif stmt.kind == ps.StatementKind.WhileLoop:
-            print("whileloop statement")
-        elif stmt.kind == ps.StatementKind.DoWhileLoop:
-            print("dowhileloop statement")
-        elif stmt.kind == ps.StatementKind.ForeverLoop:
-            print("foreverloop statement")
-        elif stmt.kind == ps.StatementKind.Timed:
-            print("timed statement")
-            timing_control_object = stmt.timing
-            block_stmt = stmt.stmt
-            self.visit_stmt(block_stmt)
-        elif stmt.kind == ps.StatementKind.ImmediateAssertion:
-            print("immediateassertion statement")
-        elif stmt.kind == ps.StatementKind.ConcurrentAssertion:
-            print("concurrentassertion statement")
-        elif stmt.kind == ps.StatementKind.DisableFork:
-            print("disablefork statement")
-        elif stmt.kind == ps.StatementKind.Wait:
-            print("wait statement")
-        elif stmt.kind == ps.StatementKind.WaitFork:
-            print("waitfork statement")
-        elif stmt.kind == ps.StatementKind.WaitOrder:
-            print("waitorder statement")
-        elif stmt.kind == ps.StatementKind.EventTrigger:
-            print("eventtrigger statement")
-        elif stmt.kind == ps.StatementKind.ProceduralAssign:
-            print("proceduralassign statement")
-        elif stmt.kind == ps.StatementKind.ProceduralDeassign:
-            print("proceduraldeassign statement")
-        elif stmt.kind == ps.StatementKind.RandCase:
-            print("randcase statement")
-        elif stmt.kind == ps.StatementKind.RandSequence:
-            print("randsequence statement")
-        elif stmt.kind == ps.StatementKind.ProceduralChecker:
-            print("proceduralchecker statement")
-    
+        elif kind == ps.StatementKind.Case:
+            self.branch_points += 1
+            self.visit_expr(stmt.expr)
+            for case in stmt.cases:
+                for e in case.exprs:
+                    self.visit_expr(e)
+                self.visit_stmt(case.stmt)
+
+        elif kind in [ps.StatementKind.WhileLoop, ps.StatementKind.DoWhileLoop,
+                      ps.StatementKind.ForLoop, ps.StatementKind.ForeverLoop,
+                      ps.StatementKind.RepeatLoop, ps.StatementKind.ForeachLoop]:
+            self.branch_points += 1
+            if hasattr(stmt, 'cond'):
+                self.visit_expr(stmt.cond)
+            if hasattr(stmt, 'init'):
+                self.visit_stmt(stmt.init)
+            if hasattr(stmt, 'body'):
+                self.visit_stmt(stmt.body)
+            if hasattr(stmt, 'incr'):
+                self.visit_stmt(stmt.incr)
+            self.paths += 1  # conservative
+
+        elif kind == ps.StatementKind.List and hasattr(stmt, 'body'):
+            for s in stmt.body:
+                self.visit_stmt(s)
+
+        elif kind == ps.StatementKind.Block and hasattr(stmt, 'body'):
+            for substmt in stmt.body:
+                self.visit_stmt(substmt)
+
+        elif kind in [ps.StatementKind.Return, ps.StatementKind.Break,
+                      ps.StatementKind.Continue, ps.StatementKind.Disable,
+                      ps.StatementKind.ForeverLoop]:
+            self.paths += 1
+
+        elif kind == ps.StatementKind.Timed and hasattr(stmt, 'stmt'):
+            self.visit_stmt(stmt.stmt)
+
+        elif kind in [ps.StatementKind.ImmediateAssertion, ps.StatementKind.ConcurrentAssertion,
+                      ps.StatementKind.Wait, ps.StatementKind.WaitFork, ps.StatementKind.WaitOrder,
+                      ps.StatementKind.RandCase, ps.StatementKind.RandSequence]:
+            if hasattr(stmt, 'stmt'):
+                self.visit_stmt(stmt.stmt)
+
+        elif kind in [ps.StatementKind.ExpressionStatement,
+                      ps.StatementKind.ProceduralAssign, ps.StatementKind.ProceduralDeassign,
+                      ps.StatementKind.DisableFork, ps.StatementKind.EventTrigger,
+                      ps.StatementKind.VariableDeclaration, ps.StatementKind.Empty]:
+            pass  # no effect on path or branching
+
+        else:
+            pass  # other kinds not relevant here
+
+    def visit_expr(self, expr):
+        if expr is None:
+            return
+
+        kind = expr.kind
+        if kind == ps.ExpressionKind.ConditionalOp:
+            self.branch_points += 1
+            self.visit_expr(expr.predicate)
+            self.visit_expr(expr.left)
+            self.visit_expr(expr.right)
+
+        elif kind == ps.ExpressionKind.BinaryOp:
+            self.visit_expr(expr.left)
+            self.visit_expr(expr.right)
+
+        elif kind == ps.ExpressionKind.UnaryOp:
+            self.visit_expr(expr.operand)
+
+        elif kind in [ps.ExpressionKind.Assignment,
+                      ps.ExpressionKind.NamedValue,
+                      ps.ExpressionKind.ElementSelect,
+                      ps.ExpressionKind.RangeSelect,
+                      ps.ExpressionKind.MemberAccess,
+                      ps.ExpressionKind.Call]:
+            if hasattr(expr, 'left'):
+                self.visit_expr(expr.left)
+            if hasattr(expr, 'right'):
+                self.visit_expr(expr.right)
+            if hasattr(expr, 'value'):
+                self.visit_expr(expr.value)
+
+        elif kind in [ps.ExpressionKind.Concatenation, ps.ExpressionKind.Replication,
+                      ps.ExpressionKind.StreamingConcatenation,
+                      ps.ExpressionKind.SimpleAssignmentPattern,
+                      ps.ExpressionKind.StructuredAssignmentPattern,
+                      ps.ExpressionKind.ReplicatedAssignmentPattern,
+                      ps.ExpressionKind.List, ps.ExpressionKind.Pattern,
+                      ps.ExpressionKind.StructurePattern]:
+            for e in getattr(expr, 'elements', getattr(expr, 'operands', [])):
+                if hasattr(e, 'value'):
+                    self.visit_expr(e.value)
+                else:
+                    self.visit_expr(e)
+
     def visit(self, symbol):
+        if not isinstance(symbol, ps.Symbol):
+            return
         if symbol.kind == ps.SymbolKind.Unknown:
-            print("unknown symbol")
+            # unknown symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Root:
-            print("root symbol")
+            # root symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Definition:
-            print("definition symbol")
+            # definition symbol
+            ...
         elif symbol.kind == ps.SymbolKind.CompilationUnit:
-            print("compilationunit symbol")
+            # compilationunit symbol
+            ...
         elif symbol.kind == ps.SymbolKind.DeferredMember:
-            print("deferredmember symbol")
+            # deferredmember symbol
+            ...
         elif symbol.kind == ps.SymbolKind.TransparentMember:
-            print("transparentmember symbol")
+            # transparentmember symbol
+            ...
         elif symbol.kind == ps.SymbolKind.EmptyMember:
-            print("emptymember symbol")
+            # emptymember symbol
+            ...
         elif symbol.kind == ps.SymbolKind.PredefinedIntegerType:
-            print("predefinedintegertype symbol")
+            # predefinedintegertype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ScalarType:
-            print("scalartype symbol")
+            # scalartype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.FloatingType:
-            print("floatingtype symbol")
+            # floatingtype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.EnumType:
-            print("enumtype symbol")
+            # enumtype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.EnumValue:
-            print("enumvalue symbol")
+            # enumvalue symbol
+            ...
         elif symbol.kind == ps.SymbolKind.PackedArrayType:
-            print("packedarraytype symbol")
+            # packedarraytype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.FixedSizeUnpackedArrayType:
-            print("fixedsizeunpackedarraytype symbol")
+            # fixedsizeunpackedarraytype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.DynamicArrayType:
-            print("dynamicarraytype symbol")
+            # dynamicarraytype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.DPIOpenArrayType:
-            print("dpiopenarraytype symbol")
+            # dpiopenarraytype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.AssociativeArrayType:
-            print("associativearraytype symbol")
+            # associativearraytype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.QueueType:
-            print("queuetype symbol")
+            # queuetype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.PackedStructType:
-            print("packedstructtype symbol")
+            # packedstructtype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.UnpackedStructType:
-            print("unpackedstructtype symbol")
+            # unpackedstructtype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.PackedUnionType:
-            print("packeduniontype symbol")
+            # packeduniontype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.UnpackedUnionType:
-            print("unpackeduniontype symbol")
+            # unpackeduniontype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ClassType:
-            print("classtype symbol")
+            # classtype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.CovergroupType:
-            print("covergrouptype symbol")
+            # covergrouptype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.VoidType:
-            print("voidtype symbol")
+            # voidtype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.NullType:
-            print("nulltype symbol")
+            # nulltype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.CHandleType:
-            print("chandletype symbol")
+            # chandletype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.StringType:
-            print("stringtype symbol")
+            # stringtype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.EventType:
-            print("eventtype symbol")
+            # eventtype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.UnboundedType:
-            print("unboundedtype symbol")
+            # unboundedtype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.TypeRefType:
-            print("typereftype symbol")
+            # typereftype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.UntypedType:
-            print("untypedtype symbol")
+            # untypedtype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.SequenceType:
-            print("sequencetype symbol")
+            # sequencetype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.PropertyType:
-            print("propertytype symbol")
+            # propertytype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.VirtualInterfaceType:
-            print("virtualinterfacetype symbol")
+            # virtualinterfacetype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.TypeAlias:
-            print("typealias symbol")
+            # typealias symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ErrorType:
-            print("errortype symbol")
+            # errortype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ForwardingTypedef:
-            print("forwardingtypedef symbol")
+            # forwardingtypedef symbol
+            ...
         elif symbol.kind == ps.SymbolKind.NetType:
-            print("nettype symbol")
+            # nettype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Parameter:
-            print("parameter symbol")
+            # parameter symbol
+            ...
         elif symbol.kind == ps.SymbolKind.TypeParameter:
-            print("typeparameter symbol")
+            # typeparameter symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Port:
-            print(f"port symbol: {symbol.name}")
+            # port symbol: {symbol.name}
+            ...
         elif symbol.kind == ps.SymbolKind.MultiPort:
-            print("multiport symbol")
+            # multiport symbol
+            ...
         elif symbol.kind == ps.SymbolKind.InterfacePort:
-            print("interfaceport symbol")
+            # interfaceport symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Modport:
-            print("modport symbol")
+            # modport symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ModportPort:
-            print("modportport symbol")
+            # modportport symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ModportClocking:
-            print("modportclocking symbol")
+            # modportclocking symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Instance:
-            print("instance symbol")
+            # instance symbol
+            ...
             instance_name = symbol.name
         elif symbol.kind == ps.SymbolKind.InstanceBody:
-            print("instancebody symbol")
+            # instancebody symbol
+            ...
             parent_instance = symbol.parentInstance
         elif symbol.kind == ps.SymbolKind.InstanceArray:
-            print("instancearray symbol")
+            # instancearray symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Package:
-            print("package symbol")
+            # package symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ExplicitImport:
-            print("explicitimport symbol")
+            # explicitimport symbol
+            ...
         elif symbol.kind == ps.SymbolKind.WildcardImport:
-            print("wildcardimport symbol")
+            # wildcardimport symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Attribute:
-            print("attribute symbol")
+            # attribute symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Genvar:
-            print("genvar symbol")
+            # genvar symbol
+            ...
         elif symbol.kind == ps.SymbolKind.GenerateBlock:
-            print("generateblock symbol")
+            # generateblock symbol
+            ...
         elif symbol.kind == ps.SymbolKind.GenerateBlockArray:
-            print("generateblockarray symbol")
+            # generateblockarray symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ProceduralBlock:
-            print("procedural block")
-            self.visit_stmt(symbol.body) # leaving here
+            # procedural block
+            ...
+            self.visit_stmt(symbol.body)
         elif symbol.kind == ps.SymbolKind.StatementBlock:
-            print("statementblock symbol")
+            # statementblock symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Net:
-            print(f"net symbol: {symbol.name}")
+            # net symbol: {symbol.name}
+            ...
         elif symbol.kind == ps.SymbolKind.Variable:
-            print("variable symbol")
+            # variable symbol
+            ...
         elif symbol.kind == ps.SymbolKind.FormalArgument:
-            print("formalargument symbol")
+            # formalargument symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Field:
-            print("field symbol")
+            # field symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ClassProperty:
-            print("classproperty symbol")
+            # classproperty symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Subroutine:
-            print("subroutine symbol")
+            # subroutine symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ContinuousAssign:
-            print("continuousassign symbol")
+            # continuousassign symbol
+            ...
             assignment_expr = symbol.assignment
             self.visit_expr(assignment_expr)
         elif symbol.kind == ps.SymbolKind.ElabSystemTask:
-            print("elabsystemtask symbol")
+            # elabsystemtask symbol
+            ...
         elif symbol.kind == ps.SymbolKind.GenericClassDef:
-            print("genericclassdef symbol")
+            # genericclassdef symbol
+            ...
         elif symbol.kind == ps.SymbolKind.MethodPrototype:
-            print("methodprototype symbol")
+            # methodprototype symbol
+            ...
         elif symbol.kind == ps.SymbolKind.UninstantiatedDef:
-            print("uninstantiateddef symbol")
+            # uninstantiateddef symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Iterator:
-            print("iterator symbol")
+            # iterator symbol
+            ...
         elif symbol.kind == ps.SymbolKind.PatternVar:
-            print("patternvar symbol")
+            # patternvar symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ConstraintBlock:
-            print("constraintblock symbol")
+            # constraintblock symbol
+            ...
         elif symbol.kind == ps.SymbolKind.DefParam:
-            print("defparam symbol")
+            # defparam symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Specparam:
-            print("specparam symbol")
+            # specparam symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Primitive:
-            print("primitive symbol")
+            # primitive symbol
+            ...
         elif symbol.kind == ps.SymbolKind.PrimitivePort:
-            print("primitiveport symbol")
+            # primitiveport symbol
+            ...
         elif symbol.kind == ps.SymbolKind.PrimitiveInstance:
-            print("primitiveinstance symbol")
+            # primitiveinstance symbol
+            ...
         elif symbol.kind == ps.SymbolKind.SpecifyBlock:
-            print("specifyblock symbol")
+            # specifyblock symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Sequence:
-            print("sequence symbol")
+            # sequence symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Property:
-            print("property symbol")
+            # property symbol
+            ...
         elif symbol.kind == ps.SymbolKind.AssertionPort:
-            print("assertionport symbol")
+            # assertionport symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ClockingBlock:
-            print("clockingblock symbol")
+            # clockingblock symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ClockVar:
-            print("clockvar symbol")
+            # clockvar symbol
+            ...
         elif symbol.kind == ps.SymbolKind.LocalAssertionVar:
-            print("localassertionvar symbol")
+            # localassertionvar symbol
+            ...
         elif symbol.kind == ps.SymbolKind.LetDecl:
-            print("letdecl symbol")
+            # letdecl symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Checker:
-            print("checker symbol")
+            # checker symbol
+            ...
         elif symbol.kind == ps.SymbolKind.CheckerInstance:
-            print("checkerinstance symbol")
+            # checkerinstance symbol
+            ...
         elif symbol.kind == ps.SymbolKind.CheckerInstanceBody:
-            print("checkerinstancebody symbol")
+            # checkerinstancebody symbol
+            ...
         elif symbol.kind == ps.SymbolKind.RandSeqProduction:
-            print("randseqproduction symbol")
+            # randseqproduction symbol
+            ...
         elif symbol.kind == ps.SymbolKind.CovergroupBody:
-            print("covergroupbody symbol")
+            # covergroupbody symbol
+            ...
         elif symbol.kind == ps.SymbolKind.Coverpoint:
-            print("coverpoint symbol")
+            # coverpoint symbol
+            ...
         elif symbol.kind == ps.SymbolKind.CoverCross:
-            print("covercross symbol")
+            # covercross symbol
+            ...
         elif symbol.kind == ps.SymbolKind.CoverCrossBody:
-            print("covercrossbody symbol")
+            # covercrossbody symbol
+            ...
         elif symbol.kind == ps.SymbolKind.CoverageBin:
-            print("coveragebin symbol")
+            # coveragebin symbol
+            ...
         elif symbol.kind == ps.SymbolKind.TimingPath:
-            print("timingpath symbol")
+            # timingpath symbol
+            ...
         elif symbol.kind == ps.SymbolKind.PulseStyle:
-            print("pulsestyle symbol")
+            # pulsestyle symbol
+            ...
         elif symbol.kind == ps.SymbolKind.SystemTimingCheck:
-            print("systemtimingcheck symbol")
+            # systemtimingcheck symbol
+            ...
         elif symbol.kind == ps.SymbolKind.AnonymousProgram:
-            print("anonymousprogram symbol")
+            # anonymousprogram symbol
+            ...
         elif symbol.kind == ps.SymbolKind.NetAlias:
-            print("netalias symbol")
+            # netalias symbol
+            ...
         elif symbol.kind == ps.SymbolKind.ConfigBlock:
-            print("configblock symbol")
+            # configblock symbol
+            ...
         self.symbol_id_to_symbol[self.symbol_id] = symbol
-        
+
         try:
             self.kind_to_symbol_id[symbol.kind].append(self.symbol_id)
         except KeyError:
@@ -440,6 +509,394 @@ class SlangSymbolVisitor:
         except AttributeError:
             pass
         self.symbol_id += 1
+
+class SymbolicDFS:
+    """DFS visitor for Slang symbols, updating symbolic store and path condition."""
+
+    def __init__(self, cycles, symbolic_store=None, path_condition=None):
+        self.symbolic_store = symbolic_store if symbolic_store is not None else {}
+        self.path_condition = path_condition if path_condition is not None else []
+        self.visited = set()
+        self.cycles = 0
+
+    def dfs(self, symbol):
+        if not isinstance(symbol, ps.Symbol):
+            return
+
+        if symbol is None or symbol in self.visited:
+            return
+        self.visited.add(symbol)
+
+        # Update symbolic store for variables, parameters, etc.
+        if hasattr(symbol, "name") and symbol.kind in (
+            ps.SymbolKind.Variable,
+            ps.SymbolKind.Parameter,
+            ps.SymbolKind.Port,
+        ):
+            self.symbolic_store[symbol.name] = symbol
+
+        # Update path condition for conditional statements
+        if symbol.kind == ps.SymbolKind.ProceduralBlock and hasattr(symbol, "body"):
+            self.dfs_stmt(symbol.body)
+        elif symbol.kind == ps.SymbolKind.ContinuousAssign and hasattr(symbol, "assignment"):
+            self.dfs_expr(symbol.assignment)
+
+        # Recursively visit children if available
+        if hasattr(symbol, "members"):
+            for member in symbol.members:
+                self.dfs(member)
+        if hasattr(symbol, "body") and symbol.kind != ps.SymbolKind.ProceduralBlock:
+            self.dfs(symbol.body)
+
+    def dfs_stmt(self, stmt):
+        if stmt is None:
+            return
+        if stmt.kind == ps.StatementKind.ExpressionStatement:
+            self.dfs_expr(stmt.expr)
+        elif stmt.kind == ps.StatementKind.Block:
+            if hasattr(stmt, "body"):
+                self.dfs_stmt(stmt.body)
+        elif stmt.kind == ps.StatementKind.Conditional:
+            cond_expr = stmt.conditions[0].expr if stmt.conditions else None
+            if cond_expr:
+                self.dfs_expr(cond_expr)
+                self.path_condition.append(cond_expr)
+            if stmt.ifTrue:
+                self.dfs_stmt(stmt.ifTrue)
+            if stmt.ifFalse:
+                self.dfs_stmt(stmt.ifFalse)
+            if cond_expr:
+                self.path_condition.pop()
+        elif stmt.kind == ps.StatementKind.List:
+            for s in stmt.body:
+                self.dfs_stmt(s)
+
+    def visit_expr(self, m: ExecutionManager, s: SymbolicState, expr):
+        if expr is None:
+            return
+
+        kind = expr.kind
+
+        if kind == ps.ExpressionKind.NamedValue:
+            return s.store[m.curr_module].get(expr.symbol.name, init_symbol())
+
+        elif kind == ps.ExpressionKind.BinaryOp:
+            self.visit_expr(m, s, expr.left)
+            self.visit_expr(m, s, expr.right)
+
+        elif kind == ps.ExpressionKind.UnaryOp:
+            self.visit_expr(m, s, expr.operand)
+
+        elif kind == ps.ExpressionKind.ConditionalOp:
+            self.visit_expr(m, s, expr.predicate)
+            self.visit_expr(m, s, expr.left)
+            self.visit_expr(m, s, expr.right)
+
+        elif kind == ps.ExpressionKind.Assignment:
+            self.visit_expr(m, s, expr.left)
+            self.visit_expr(m, s, expr.right)
+
+        elif kind in [ps.ExpressionKind.Concatenation, ps.ExpressionKind.StreamingConcatenation]:
+            for e in expr.operands:
+                self.visit_expr(m, s, e)
+
+        elif kind == ps.ExpressionKind.Call:
+            for arg in expr.arguments:
+                self.visit_expr(m, s, arg)
+
+        elif kind == ps.ExpressionKind.ElementSelect:
+            self.visit_expr(m, s, expr.value)
+            self.visit_expr(m, s, expr.selector)
+
+        elif kind == ps.ExpressionKind.RangeSelect:
+            self.visit_expr(m, s, expr.value)
+            self.visit_expr(m, s, expr.left)
+            self.visit_expr(m, s, expr.right)
+
+        elif kind in [ps.ExpressionKind.MemberAccess, ps.ExpressionKind.Streaming,
+                    ps.ExpressionKind.Replication, ps.ExpressionKind.TaggedUnion,
+                    ps.ExpressionKind.Cast, ps.ExpressionKind.SignedCast,
+                    ps.ExpressionKind.UnsignedCast, ps.ExpressionKind.CopyClass,
+                    ps.ExpressionKind.StreamExpression, ps.ExpressionKind.StreamExpressionWithRange,
+                    ps.ExpressionKind.Parenthesized]:
+            self.visit_expr(m, s, expr.value)
+
+        elif kind in [ps.ExpressionKind.SimpleAssignmentPattern, ps.ExpressionKind.List,
+                    ps.ExpressionKind.Pattern]:
+            for e in expr.elements:
+                self.visit_expr(m, s, e)
+
+        elif kind in [ps.ExpressionKind.StructuredAssignmentPattern, ps.ExpressionKind.StructurePattern]:
+            for e in expr.elements:
+                self.visit_expr(m, s, e.value)
+
+        elif kind == ps.ExpressionKind.ReplicatedAssignmentPattern:
+            self.visit_expr(m, s, expr.value)
+            for e in expr.elements:
+                self.visit_expr(m, s, e)
+
+        elif kind in [ps.ExpressionKind.MinTypMax]:
+            self.visit_expr(m, s, expr.min)
+            self.visit_expr(m, s, expr.typ)
+            self.visit_expr(m, s, expr.max)
+
+        # Ignore literals and null
+        elif kind in [ps.ExpressionKind.IntegerLiteral, ps.ExpressionKind.RealLiteral,
+                    ps.ExpressionKind.TimeLiteral, ps.ExpressionKind.NullLiteral,
+                    ps.ExpressionKind.StringLiteral, ps.ExpressionKind.UnbasedUnsizedLiteral]:
+            pass
+
+        elif kind == ps.ExpressionKind.Unknown:
+            pass
+
+
+    def visit_stmt(self, m: ExecutionManager, s: SymbolicState, stmt, modules=None, direction=None):
+        if stmt is None or m.ignore:
+            return
+
+        kind = stmt.kind
+
+        if kind == ps.StatementKind.ExpressionStatement:
+            self.visit_expr(m, s, stmt.expr)
+
+        elif kind == ps.StatementKind.Block and hasattr(stmt, "body"):
+            for substmt in stmt.body:
+                self.visit_stmt(m, s, substmt, modules, direction)
+
+        elif kind == ps.StatementKind.Conditional:
+            cond_expr = stmt.conditions[0].expr if stmt.conditions else None
+            if cond_expr:
+                m.branch_points += 1
+                self.visit_expr(m, s, cond_expr)
+                s.pc.push()
+                s.assertion_counter += 1
+                cond_z3 = self.expr_to_z3(m, s, cond_expr)
+                if direction:
+                    key = str(cond_z3)
+                    self.branch = True
+                    if m.cache.exists(key):
+                        result = m.cache.get(key).decode()
+                    else:
+                        result = str(solve_pc(s.pc))
+                        m.cache.set(str(cond_z3), str(solve_pc(s.pc)))
+                    s.pc.assert_and_track(cond_z3, f"p{s.assertion_counter}")
+                else:
+                    self.branch = False
+                    key = f"~{cond_z3}"
+                    if m.cache.exists(key):
+                        result = m.cache.get(key).decode()
+                    else:
+                        result = str(solve_pc(s.pc))
+                        m.cache.set(f"~{cond_z3}", str(solve_pc(s.pc)))
+                    s.pc.assert_and_track(cond_z3, f"p{s.assertion_counter}")
+                if not solve_pc(s.pc):
+                    m.cache.set(f"~{str(cond_z3)}", False)
+                    s.pc.pop()
+                    m.abandon = True
+                    m.ignore = True
+                    return
+
+            if stmt.ifTrue:
+                self.visit_stmt(m, s, stmt.ifTrue, modules, direction)
+            if stmt.ifFalse:
+                self.visit_stmt(m, s, stmt.ifFalse, modules, direction)
+
+            if cond_expr:
+                s.pc.pop()
+
+        elif kind == ps.StatementKind.List:
+            for s_sub in stmt.body:
+                self.visit_stmt(m, s, s_sub, modules, direction)
+
+        elif kind == ps.StatementKind.Loop:
+            if hasattr(stmt, "init"):
+                self.visit_stmt(m, s, stmt.init, modules, direction)
+            if hasattr(stmt, "cond"):
+                self.visit_expr(m, s, stmt.cond)
+            if hasattr(stmt, "body"):
+                self.visit_stmt(m, s, stmt.body, modules, direction)
+            if hasattr(stmt, "incr"):
+                self.visit_stmt(m, s, stmt.incr, modules, direction)
+
+        elif kind == ps.StatementKind.While:
+            m.branch_points += 1
+            if hasattr(stmt, "cond"):
+                self.visit_expr(m, s, stmt.cond)
+                s.pc.push()
+                s.assertion_counter += 1
+                cond_z3 = self.expr_to_z3(m, s, stmt.cond)
+                if direction:
+                    key = str(cond_z3)
+                    self.branch = True
+                    if m.cache.exists(key):
+                        result = m.cache.get(key).decode()
+                    else:
+                        result = str(solve_pc(s.pc))
+                        m.cache.set(str(cond_z3), str(solve_pc(s.pc)))
+                    s.pc.assert_and_track(cond_z3, f"p{s.assertion_counter}")
+                else:
+                    key = str(f"~{cond_z3}")
+                    self.branch = False
+                    if m.cache.exists(key):
+                        result = m.cache.get(key).decode()
+                    else:
+                        result = str(solve_pc(s.pc))
+                        m.cache.set(f"~{str(cond_z3)}", str(solve_pc(s.pc)))
+                    s.pc.assert_and_track(~cond_z3, f"p{s.assertion_counter}")
+                if not solve_pc(s.pc):
+                    s.pc.pop()
+                    m.cache.set(str(cond_z3), False)
+                    m.abandon = True
+                    m.ignore = True
+                    return
+            if hasattr(stmt, "body"):
+                self.visit_stmt(m, s, stmt.body, modules, direction)
+            if hasattr(stmt, "cond"):
+                s.pc.pop()
+
+        elif kind == ps.StatementKind.DoWhile:
+            m.branch_points += 1
+            if hasattr(stmt, "body"):
+                self.visit_stmt(m, s, stmt.body, modules, direction)
+            if hasattr(stmt, "cond"):
+                self.visit_expr(m, s, stmt.cond)
+
+        elif kind == ps.StatementKind.Case:
+            m.branch_points += 1
+            self.visit_expr(m, s, stmt.expr)
+            for case in stmt.cases:
+                for e in case.exprs:
+                    self.visit_expr(m, s, e)
+                    s.pc.push()
+                    s.assertion_counter += 1
+                    case_z3 = self.expr_to_z3(m, s, e)
+                    if direction:
+                        key = str(cond_z3)
+                        self.branch = True
+                        if m.cache.exists(key):
+                            result = m.cache.get(key).decode()
+                        else:
+                            result = str(solve_pc(s.pc))
+                            m.cache.set(str(cond_z3), str(solve_pc(s.pc)))
+                        s.pc.assert_and_track(cond_z3, f"p{s.assertion_counter}")
+                    else:
+                        key = str(f"~{cond_z3}")
+                        self.branch = False
+                        if m.cache.exists(key):
+                            result = m.cache.get(key).decode()
+                        else:
+                            result = str(solve_pc(s.pc))
+                            m.cache.set(f"~{str(cond_z3)}", str(solve_pc(s.pc)))
+                        s.pc.assert_and_track(~cond_z3, f"p{s.assertion_counter}")
+                    if not solve_pc(s.pc):
+                        s.pc.pop()
+                        m.engine.cache.set(str(cond_z3), False)
+                        m.abandon = True
+                        m.ignore = True
+                        return
+                    self.visit_stmt(m, s, case.stmt, modules, direction)
+                    s.pc.pop()
+
+        elif kind in [ps.StatementKind.Assign, ps.StatementKind.NonBlockingAssign]:
+            self.visit_expr(m, s, stmt.left)
+            self.visit_expr(m, s, stmt.right)
+            if hasattr(stmt.left, 'symbol') and hasattr(stmt.right, 'symbol'):
+                lhs = stmt.left.symbol.name
+                rhs = stmt.right.symbol.name
+                s.store[m.curr_module][lhs] = s.store[m.curr_module].get(rhs, init_symbol())
+            elif hasattr(stmt.left, 'symbol'):
+                lhs = stmt.left.symbol.name
+                s.store[m.curr_module][lhs] = init_symbol()
+
+        elif kind == ps.StatementKind.ProcedureCall:
+            self.visit_expr(m, s, stmt.expr)
+
+        elif kind in [ps.StatementKind.Initial, ps.StatementKind.Always,
+                    ps.StatementKind.ParallelBlock, ps.StatementKind.SequentialBlock,
+                    ps.StatementKind.TimingControl]:
+            self.visit_stmt(m, s, stmt.body, modules, direction)
+
+        elif kind in [ps.StatementKind.Assert, ps.StatementKind.Assume, ps.StatementKind.Cover]:
+            self.visit_expr(m, s, stmt.expr)
+            self.visit_stmt(m, s, stmt.body, modules, direction)
+            if hasattr(stmt, "elseBody"):
+                self.visit_stmt(m, s, stmt.elseBody, modules, direction)
+
+        elif kind == ps.StatementKind.Return and hasattr(stmt, "expr"):
+            self.visit_expr(m, s, stmt.expr)
+
+        elif kind in [ps.StatementKind.Break, ps.StatementKind.Continue, ps.StatementKind.Empty,
+                    ps.StatementKind.Declaration, ps.StatementKind.DisableFork,
+                    ps.StatementKind.WaitFork, ps.StatementKind.EventTrigger,
+                    ps.StatementKind.Disable, ps.StatementKind.WaitOrder]:
+            pass  # No action needed
+
+class ExpressionSymbolCollector:
+    """Visitor that traverses an expression and collects parameter and port symbols."""
+
+    def __init__(self):
+        self.parameters = set()
+        self.ports = set()
+
+    def visit(self, expr):
+        if expr is None:
+            return
+        kind = expr.kind
+        if kind == ps.ExpressionKind.NamedValue:
+            symbol = getattr(expr, "symbol", None)
+            if symbol is not None:
+                if symbol.kind == ps.SymbolKind.Parameter:
+                    self.parameters.add(symbol)
+                elif symbol.kind == ps.SymbolKind.Port:
+                    self.ports.add(symbol)
+        elif kind == ps.ExpressionKind.BinaryOp:
+            self.visit(expr.left)
+            self.visit(expr.right)
+        elif kind == ps.ExpressionKind.UnaryOp:
+            self.visit(expr.operand)
+        elif kind == ps.ExpressionKind.Assignment:
+            self.visit(expr.left)
+            self.visit(expr.right)
+        elif kind == ps.ExpressionKind.Concatenation:
+            for e in expr.operands:
+                self.visit(e)
+        elif kind == ps.ExpressionKind.Call:
+            for arg in expr.arguments:
+                self.visit(arg)
+        elif kind == ps.ExpressionKind.ElementSelect:
+            self.visit(expr.value)
+            self.visit(expr.selector)
+        elif kind == ps.ExpressionKind.RangeSelect:
+            self.visit(expr.value)
+            self.visit(expr.left)
+            self.visit(expr.right)
+        elif kind == ps.ExpressionKind.ConditionalOp:
+            self.visit(expr.predicate)
+            self.visit(expr.left)
+            self.visit(expr.right)
+        elif kind == ps.ExpressionKind.MemberAccess:
+            self.visit(expr.value)
+        elif kind == ps.ExpressionKind.Streaming:
+            self.visit(expr.value)
+        elif kind == ps.ExpressionKind.Replication:
+            self.visit(expr.value)
+            for e in expr.elements:
+                self.visit(e)
+        elif kind == ps.ExpressionKind.SimpleAssignmentPattern:
+            for e in expr.elements:
+                self.visit(e)
+        elif kind == ps.ExpressionKind.StructuredAssignmentPattern:
+            for e in expr.elements:
+                self.visit(e.value)
+        elif kind == ps.ExpressionKind.ReplicatedAssignmentPattern:
+            self.visit(expr.value)
+            for e in expr.elements:
+                self.visit(e)
+        # Add more cases as needed for other expression kinds
+
+    def collect(self, expr):
+        self.visit(expr)
+        return list(self.parameters), list(self.ports)
 
 
 class SlangNodeVisitor:
