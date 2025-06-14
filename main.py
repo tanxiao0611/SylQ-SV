@@ -28,7 +28,8 @@ from pyverilog.dataflow.dataflow_analyzer import VerilogDataflowAnalyzer
 from pyverilog.dataflow.optimizer import VerilogDataflowOptimizer
 from pyverilog.dataflow.graphgen import VerilogGraphGenerator
 import pygraphviz as pgv
-import pyslang
+import pyslang as ps
+from helpers.slang_helpers import SlangSymbolVisitor, SlangNodeVisitor, SymbolicDFS
 import redis
 import threading
 import time
@@ -112,23 +113,43 @@ def main():
 
     if options.showdebug:
         engine.debug = True
-    
+
+
     for f in filelist:
         if not os.path.exists(f):
             raise IOError("file not found: " + f)
+
+    # If more than one file, create a .F file listing all files
+    if len(filelist) > 1:
+        flist_path = "filelist.F"
+        with open(flist_path, "w") as flist:
+            for f in filelist:
+                flist.write(f + "\n")
+        filelist = [flist_path]
 
     if len(filelist) == 0:
         showVersion()
     
     if options.sv:
-        tree = pyslang.SyntaxTree.fromFile('designs/test-designs/updowncounter.v')
-        print(f"total number of modules defined in this file {len(tree.root.members)}")
-        top_level_module = tree.root.members[0]
-        print(top_level_module.header)
-        header = top_level_module.header
-        modules = tree.root.members
         start = time.process_time()
-        engine.execute_sv(top_level_module, modules, None, num_cycles)
+        driver = ps.Driver()
+        driver.addStandardArgs()
+        driver.processCommandFiles(filelist[0], True, True)
+        driver.processOptions()
+        driver.parseAllSources()
+        
+        compilation = driver.createCompilation()
+        modules =  compilation.getDefinitions()
+        successful_compilation = driver.reportCompilation(compilation, False)
+        if successful_compilation:
+            #print(driver.reportMacros())
+            my_visitor_for_symbol = SymbolicDFS(num_cycles)
+            symbol_visitor = SlangSymbolVisitor(num_cycles)
+            engine.execute_sv(my_visitor_for_symbol, modules, None, num_cycles)
+            symbol_visitor.visit(modules)
+            print(symbol_visitor.branch_points)
+            print(symbol_visitor.paths)
+            
         end = time.process_time()
         print(f"Elapsed time {end - start}")
         if timer:
@@ -194,6 +215,12 @@ def main():
     start = time.process_time()
     engine.execute(top_level_module, modules, None, directives, num_cycles)
     end = time.process_time()
+    if options.use_cache and hasattr(engine, "cache"):
+        try:
+            engine.cache.save()
+            print("Redis cache saved to RDB.")
+        except Exception as e:
+            print(f"Failed to save Redis cache: {e}")
     print(f"Elapsed time {end - start}")
 
 if __name__ == '__main__':
