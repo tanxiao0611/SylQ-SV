@@ -793,7 +793,6 @@ class DepthFirst(Search):
             zero_bv = Int2BV(zero, 1)
             if self.branch:
                 s.pc.push()
-                print("howdy !")
                 s.assertion_counter += 1
                 s.pc.assert_and_track(x==one_bv, f"p{s.assertion_counter}")
                 if not solve_pc(s.pc):

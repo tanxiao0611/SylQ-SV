@@ -8,7 +8,6 @@ from pyverilog.vparser.ast import WhileStatement, ForStatement, CaseStatement, B
 from pyverilog.vparser.ast import Value, Reg, Initial, Eq, Identifier, Initial,  NonblockingSubstitution, Decl, Always, Assign, NotEql, Case
 from pyverilog.vparser.ast import Concat, BlockingSubstitution, Parameter, StringConst, Wire, PortArg
 from helpers.utils import init_symbol
-from helpers.slang_helpers import SlangSymbolVisitor, SlangNodeVisitor
 from typing import Optional
 # import pkg_resources
 # pkg_resources.require("pyslang==3.0.310")
@@ -73,6 +72,9 @@ class ExecutionManager:
     instances_loc = {}
     solver_time = 0
     sv = False
+    cache = None
+    path_count = 0
+    branch_count = 0
 
     def merge_states(self, state: SymbolicState, store, flag, module_name=""):
         """Merges two states. The flag is for when we are just merging a particular module"""
@@ -90,7 +92,6 @@ class ExecutionManager:
                             state.store[module_name][key2] = store[key][key2]
                         else:
                             state.store[key][key2] = store[key][key2]
-
 
     def init_run(self, m: ExecutionManager, module: ModuleDef) -> None:
         """Initalize run."""
@@ -136,66 +137,6 @@ class ExecutionManager:
                 for case in items.caselist:
                     m.num_paths *= 2
                     self.count_conditionals(m, case.statement)
-
-    def init_state(self, s: SymbolicState, prev_store, ast):
-        """give fresh symbols and merge register values in."""
-        if self.sv:
-            driver = ps.Driver()
-            driver.addStandardArgs()
-            driver.processCommandFiles("flist.txt", True)
-            driver.processOptions()
-            driver.parseAllSources()
-            
-            compilation = driver.createCompilation()
-            successful_compilation = driver.reportCompilation(compilation, False)
-            if successful_compilation:
-                print(dir(driver))
-                print(driver.reportMacros())
-                print(f"Number of syntax trees: {len(driver.syntaxTrees)}")
-                tree = driver.syntaxTrees[0]
-                print("here!")
-            
-            my_visitor_for_symbol = SlangSymbolVisitor()
-            compilation.getRoot().visit(my_visitor_for_symbol.visit)
-        
-        
-            global_module_to_port_to_direction = dict()
-            for i, curr_syntax_tree in enumerate(compilation.getSyntaxTrees()):
-                my_visitor_for_node = SlangNodeVisitor(my_visitor_for_symbol)
-                my_visitor_for_node.traverse_tree(curr_syntax_tree.root)
-                #my_visitor_for_node.build_module_to_port_to_direction(global_module_to_port_to_direction)
-            print(global_module_to_port_to_direction)
-            print("done traversal")
-            #my_visitor_for_node.traverse_tree(curr_syntax_tree.root)
-            #compilation.getRoot().visit(vis2.visit)
-            exit()
-            visitor = SlangNodeVisitor()
-            visitor.traverse_tree(ast.root)
-            params = ast.header.parameters
-            port_list = ast.header.ports
-            for i, token in enumerate(port_list):
-                port = extract_kinds_from_descendants(token, desired_kinds=[ps.SyntaxKind.ImplicitAnsiPort])
-                port_list.append(port)
-            
-            print(port_list)
-        else:
-            params = ast.paramlist.params
-            ports = ast.portlist.ports
-
-        for param in params:
-            if isinstance(param.list[0], Parameter):
-                if param.list[0].name != "clk" and param.list[0].name != "rst":
-                    s.store[self.curr_module][param.list[0].name] = init_symbol()
-
-        for port in ports:
-            if isinstance(port, Ioport):
-                if str(port.first.name) != "clk" and str(port.first.name) != "rst":
-                    s.store[self.curr_module][str(port.first.name)] = init_symbol()
-            else:
-                if port.name not in s.store[self.curr_module]:
-                    s.store[self.curr_module][port.name] = init_symbol()
-
-        self.merge_states(s, prev_store, False)
 
     def count_conditionals_2(self, m:ExecutionManager, items) -> int:
         """Rewrite to actually return an int."""
