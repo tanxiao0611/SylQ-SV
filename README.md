@@ -16,7 +16,7 @@ Install dependencies:
 * networkx: run `python3 -m pip install networkx`
 * matplotlib: run `python3 -m pip install matplotlib`
 
-## Kick-the Tires
+## Kick the Tires
 Goal: Run SylQ-SV on the OR1200 for 1 clock cycle for 5 minutes with query caching enabled, and inspect the number of symbolic paths and solver queries generated.
 
 To run the experiment, execute the following command:
