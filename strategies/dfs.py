@@ -1,13 +1,13 @@
 """Depth First Traversal of the AST."""
-from .template import Search
+#from .template import Search
 from z3 import Solver, Int, BitVec, Int2BV, IntVal, Concat
 from engine.execution_manager import ExecutionManager
 from engine.symbolic_state import SymbolicState
-from pyverilog.vparser.ast import Description, ModuleDef, Node, IfStatement, SingleStatement, And, Constant, Rvalue, Plus, Input, Output
-from pyverilog.vparser.ast import WhileStatement, ForStatement, CaseStatement, Block, SystemCall, Land, InstanceList, IntConst, Partselect, Ioport
-from pyverilog.vparser.ast import Value, Reg, Initial, Eq, Identifier, Initial,  NonblockingSubstitution, Decl, Always, Assign, NotEql, Case
-from pyverilog.vparser.ast import Concat, BlockingSubstitution, Parameter, StringConst, Wire, PortArg, Cond, Pointer, IdentifierScope, Operator, ForStatement
-from pyverilog.vparser.ast import Repeat 
+# from pyverilog.vparser.ast import Description, ModuleDef, Node, IfStatement, SingleStatement, And, Constant, Rvalue, Plus, Input, Output
+# from pyverilog.vparser.ast import WhileStatement, ForStatement, CaseStatement, Block, SystemCall, Land, InstanceList, IntConst, Partselect, Ioport
+# from pyverilog.vparser.ast import Value, Reg, Initial, Eq, Identifier, Initial,  NonblockingSubstitution, Decl, Always, Assign, NotEql, Case
+# from pyverilog.vparser.ast import Concat, BlockingSubstitution, Parameter, StringConst, Wire, PortArg, Cond, Pointer, IdentifierScope, Operator, ForStatement
+# from pyverilog.vparser.ast import Repeat 
 from helpers.utils import init_symbol
 from typing import Optional
 from helpers.rvalue_parser import tokenize, parse_tokens, evaluate, resolve_dependency, count_nested_cond, cond_options, str_to_int, str_to_bool, simpl_str_exp, conjunction_with_pointers
@@ -17,11 +17,12 @@ from itertools import product, permutations
 import os
 import copy
 import time
+import pyslang as ps
 
 
-class DepthFirst(Search):
+class DepthFirst():
 
-    def visit_module(self, m: ExecutionManager, s: SymbolicState, module: ModuleDef, modules: Optional):
+    def visit_module(self, m: ExecutionManager, s: SymbolicState, module, modules: Optional):
         """Traverse the module of a hardware design, depth first."""
         m.currLevel = 0
         params = module.paramlist.params
@@ -89,7 +90,7 @@ class DepthFirst(Search):
         
     
 
-    def visit_stmt(self, m: ExecutionManager, s: SymbolicState, stmt: Node, modules: Optional[dict], direction: Optional[int]):
+    def visit_stmt(self, m: ExecutionManager, s: SymbolicState, stmt, modules: Optional[dict], direction: Optional[int]):
         "Traverse the statements in a hardware design"
         if m.ignore:
             return
@@ -703,7 +704,7 @@ class DepthFirst(Search):
             for case in stmt.caselist:
                 self.visit_stmt(m, s, case, modules, direction)
 
-    def visit_expr(self, m: ExecutionManager, s: SymbolicState, expr: Value) -> None:
+    def visit_expr(self, m: ExecutionManager, s: SymbolicState, expr) -> None:
         """Traverse the expressions in a hardware design."""
         if isinstance(expr, Reg):
             if not expr.name in m.reg_writes:
@@ -905,7 +906,7 @@ class DepthFirst(Search):
         else:   
             return None
 
-    def execute_child(self, ast: ModuleDef, state: SymbolicState, parent_manager: Optional[ExecutionManager], instance) -> None:
+    def execute_child(self, ast, state: SymbolicState, parent_manager: Optional[ExecutionManager], instance) -> None:
         """Drives symbolic execution of child modules."""
         # different manager
         # same state

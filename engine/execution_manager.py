@@ -2,20 +2,26 @@
 a lot of this information will probably be useful when working in a specific search strategy."""
 from __future__ import annotations
 from .symbolic_state import SymbolicState
-from pyverilog.vparser.ast import ModuleDef
-from pyverilog.vparser.ast import Description, ModuleDef, Node, IfStatement, SingleStatement, And, Constant, Rvalue, Plus, Input, Output
-from pyverilog.vparser.ast import WhileStatement, ForStatement, CaseStatement, Block, SystemCall, Land, InstanceList, IntConst, Partselect, Ioport
-from pyverilog.vparser.ast import Value, Reg, Initial, Eq, Identifier, Initial,  NonblockingSubstitution, Decl, Always, Assign, NotEql, Case
-from pyverilog.vparser.ast import Concat, BlockingSubstitution, Parameter, StringConst, Wire, PortArg
+# from pyverilog.vparser.ast import ModuleDef
+# from pyverilog.vparser.ast import Description, ModuleDef, Node, IfStatement, SingleStatement, And, Constant, Rvalue, Plus, Input, Output
+# from pyverilog.vparser.ast import WhileStatement, ForStatement, CaseStatement, Block, SystemCall, Land, InstanceList, IntConst, Partselect, Ioport
+# from pyverilog.vparser.ast import Value, Reg, Initial, Eq, Identifier, Initial,  NonblockingSubstitution, Decl, Always, Assign, NotEql, Case
+# from pyverilog.vparser.ast import Concat, BlockingSubstitution, Parameter, StringConst, Wire, PortArg
 from helpers.utils import init_symbol
 from typing import Optional
 # import pkg_resources
-# pkg_resources.require("pyslang==3.0.310")
 import pyslang as ps
-#assert ps.__version__ == "3.0.310"
 
-
-CONDITIONALS = (IfStatement, ForStatement, WhileStatement, CaseStatement)
+# Using this as a reference for conditionals:
+# https://sv-lang.com/structslang_1_1syntax_1_1_statement_syntax.html
+CONDITIONALS = (
+    ps.ConditionalStatementSyntax,
+    ps.CaseStatementSyntax,
+    ps.ForeachLoopStatementSyntax,
+    ps.ForLoopStatementSyntax,
+    ps.LoopStatementSyntax,
+    ps.DoWhileStatementSyntax
+)
 
 class ExecutionManager:
     num_paths: int = 1
@@ -93,80 +99,87 @@ class ExecutionManager:
                         else:
                             state.store[key][key2] = store[key][key2]
 
-    def init_run(self, m: ExecutionManager, module: ModuleDef) -> None:
+    def init_run(self, m: ExecutionManager, module: ps.ModuleDeclarationSyntax) -> None:
         """Initalize run."""
         m.init_run_flag = True
-        self.count_conditionals(m, module.items)
+        self.count_conditionals(m, module.members)
         # these are for the COI opt
-        #self.lhs_signals(m, module.items)
-        #self.get_assertions(m, module.items)
+        #self.lhs_signals(m, module.members)
+        #self.get_assertions(m, module.members)
         m.init_run_flag = False
 
-    def count_conditionals(self, m: ExecutionManager, items):
-        """Identify control flow structures to count total number of paths."""
+    def count_conditionals(self, m: "ExecutionManager", items):
+        """Recursively count all conditional statements in the AST."""
         stmts = items
-        if isinstance(items, Block):
+        if isinstance(items, ps.BlockStatementSyntax):
             stmts = items.statements
-            items.cname = "Block"
+        # If stmts is iterable, traverse each statement
         if hasattr(stmts, '__iter__'):
             for item in stmts:
-                if isinstance(item, CONDITIONALS):
-                    if isinstance(item, IfStatement) or isinstance(item, CaseStatement):
-                        if isinstance(item, IfStatement):
-                            m.num_paths *= 2
-                            self.count_conditionals(m, item.true_statement)
-                            self.count_conditionals(m, item.false_statement)
-                        if isinstance(item, CaseStatement):
-                            for case in item.caselist:
-                                m.num_paths *= 2
-                                self.count_conditionals(m, case.statement)
-                if isinstance(item, Block):
-                    self.count_conditionals(m, item.items)
-                elif isinstance(item, Always):
-                    self.count_conditionals(m, item.statement)             
-                elif isinstance(item, Initial):
-                    self.count_conditionals(m, item.statement)
-                elif isinstance(item, Case):
-                    self.count_conditionals(m, item.statement)
-        elif items != None:
-            if isinstance(items, IfStatement):
-                m.num_paths *= 2
-                self.count_conditionals(m, items.true_statement)
-                self.count_conditionals(m, items.false_statement)
-            if isinstance(items, CaseStatement):
-                for case in items.caselist:
-                    m.num_paths *= 2
-                    self.count_conditionals(m, case.statement)
+                self.count_conditionals(m, item)
+        elif items is not None:
+            # Check for each conditional type and recurse into their bodies
+            if isinstance(items, ps.IfStatementSyntax):
+                m.num_paths += 1
+                self.count_conditionals(m, items.ifTrue)
+                if items.ifFalse is not None:
+                    self.count_conditionals(m, items.ifFalse)
+            elif isinstance(items, ps.CaseStatementSyntax):
+                m.num_paths += 1
+                for case in items.items:
+                    self.count_conditionals(m, case.statements)
+            elif isinstance(items, ps.ForLoopStatementSyntax):
+                m.num_paths += 1
+                self.count_conditionals(m, items.body)
+            elif hasattr(ps, "ForeachLoopStatementSyntax") and isinstance(items, ps.ForeachLoopStatementSyntax):
+                m.num_paths += 1
+                self.count_conditionals(m, items.body)
+            elif isinstance(items, ps.WhileLoopStatementSyntax):
+                m.num_paths += 1
+                self.count_conditionals(m, items.body)
+            elif isinstance(items, ps.DoWhileLoopStatementSyntax):
+                m.num_paths += 1
+                self.count_conditionals(m, items.body)
+            elif isinstance(items, ps.RepeatLoopStatementSyntax):
+                m.num_paths += 1
+                self.count_conditionals(m, items.body)
+            elif isinstance(items, ps.BlockStatementSyntax):
+                self.count_conditionals(m, items.statements)
+            elif hasattr(ps, "AlwaysConstructSyntax") and isinstance(items, ps.AlwaysConstructSyntax):
+                self.count_conditionals(m, items.statement)
+            elif hasattr(ps, "InitialConstructSyntax") and isinstance(items, ps.InitialConstructSyntax):
+                self.count_conditionals(m, items.statement)
+            elif hasattr(ps, "CaseItemSyntax") and isinstance(items, ps.CaseItemSyntax):
+                self.count_conditionals(m, items.statements)
 
     def count_conditionals_2(self, m:ExecutionManager, items) -> int:
         """Rewrite to actually return an int."""
         stmts = items
-        if isinstance(items, Block):
+        if isinstance(items, ps.BlockStatementSyntax):
             stmts = items.statements
-            items.cname = "Block"
+            # items.cname = "Block"
 
         if hasattr(stmts, '__iter__'):
             for item in stmts:
                 if isinstance(item, CONDITIONALS):
-                    if isinstance(item, IfStatement) or isinstance(item, CaseStatement):
-                        if isinstance(item, IfStatement):
-                            return self.count_conditionals_2(m, item.true_statement) + self.count_conditionals_2(m, item.false_statement)  + 1
-                        if isinstance(items, CaseStatement):
-                            return self.count_conditionals_2(m, items.caselist) + 1
-                if isinstance(item, Block):
-                    return self.count_conditionals_2(m, item.items)
-                elif isinstance(item, Always):
+                    if isinstance(item, ps.IfStatementSyntax) or isinstance(item, ps.CaseStatementSyntax):
+                        if isinstance(item, ps.IfStatementSyntax):
+                            return self.count_conditionals_2(m, item.ifTrue) + self.count_conditionals_2(m, item.ifFalse)  + 1
+                        if isinstance(items, ps.CaseStatementSyntax):
+                            return self.count_conditionals_2(m, items.items) + 1
+                if isinstance(item, ps.BlockStatementSyntax):
+                    return self.count_conditionals_2(m, item.statements)
+                elif hasattr(ps, "AlwaysConstructSyntax") and isinstance(item, ps.AlwaysConstructSyntax):
                     return self.count_conditionals_2(m, item.statement)             
-                elif isinstance(item, Initial):
+                elif hasattr(ps, "InitialConstructSyntax") and isinstance(item, ps.InitialConstructSyntax):
                     return self.count_conditionals_2(m, item.statement)
-        elif items != None:
-            if isinstance(items, IfStatement):
-                return  ( self.count_conditionals_2(m, items.true_statement) + 
-                self.count_conditionals_2(m, items.false_statement)) + 1
-            if isinstance(items, CaseStatement):
-                return self.count_conditionals_2(m, items.caselist) + 1
+        elif items is not None:
+            if isinstance(items, ps.IfStatementSyntax):
+                return  ( self.count_conditionals_2(m, items.ifTrue) + 
+                self.count_conditionals_2(m, items.ifFalse)) + 1
+            if isinstance(items, ps.CaseStatementSyntax):
+                return self.count_conditionals_2(m, items.items) + 1
         return 0
-
 
     def seen_all_cases(self, m: ExecutionManager, bit_index: int, nested_ifs: int) -> bool:
         """Checks if we've seen all the cases for this index in the bit string.

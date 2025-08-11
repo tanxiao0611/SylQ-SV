@@ -3,11 +3,6 @@ from math import comb
 from operator import indexOf
 import z3
 from z3 import Solver, Int, BitVec, Context, BitVecSort, ExprRef, BitVecRef, If, BitVecVal, And
-from pyverilog.vparser.parser import parse
-from pyverilog.vparser.ast import Description, ModuleDef, Node, IfStatement, SingleStatement, And, Constant, Rvalue, Plus, Input, Output
-from pyverilog.vparser.ast import WhileStatement, ForStatement, CaseStatement, Block, SystemCall, Land, InstanceList, IntConst, Partselect, Ioport
-from pyverilog.vparser.ast import Value, Reg, Initial, Eq, Identifier, Initial,  NonblockingSubstitution, Decl, Always, Assign, NotEql, Case, Pointer
-from pyverilog.vparser.ast import Concat, BlockingSubstitution, Parameter, StringConst, Wire, PortArg, Instance
 from .execution_manager import ExecutionManager
 from .symbolic_state import SymbolicState
 import os
@@ -23,6 +18,7 @@ from strategies.dfs import DepthFirst
 import sys
 import networkx as nx
 import matplotlib.pyplot as plt
+import pyslang as ps
 from pyslang import ConditionalStatementSyntax, DataDeclarationSyntax
 
 class CFG:

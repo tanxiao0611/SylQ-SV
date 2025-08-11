@@ -1,14 +1,9 @@
 """This file is the entrypoint of the execution."""
 from __future__ import absolute_import
 from __future__ import print_function
-import pyverilog
+#import pyverilog
 import z3
 from z3 import Solver, Int, BitVec, Context, BitVecSort, ExprRef, BitVecRef, If, BitVecVal, And
-from pyverilog.vparser.parser import parse
-from pyverilog.vparser.ast import Description, ModuleDef, Node, IfStatement, SingleStatement, And, Constant, Rvalue, Plus, Input, Output
-from pyverilog.vparser.ast import WhileStatement, ForStatement, CaseStatement, Block, SystemCall, Land, InstanceList, IntConst, Partselect, Ioport
-from pyverilog.vparser.ast import Value, Reg, Initial, Eq, Identifier, Initial,  NonblockingSubstitution, Decl, Always, Assign, NotEql, Case
-from pyverilog.vparser.ast import Concat, BlockingSubstitution, Parameter, StringConst, Wire, PortArg
 import sys
 import os
 from optparse import OptionParser
@@ -18,16 +13,11 @@ import time
 from itertools import product
 import logging
 import gc
-from pyverilog.vparser.preprocessor import preprocess
 from engine.execution_manager import ExecutionManager
 from engine.symbolic_state import SymbolicState
 from helpers.rvalue_parser import tokenize, parse_tokens, evaluate
 from strategies.dfs import DepthFirst
 from engine.execution_engine import ExecutionEngine
-from pyverilog.dataflow.dataflow_analyzer import VerilogDataflowAnalyzer
-from pyverilog.dataflow.optimizer import VerilogDataflowOptimizer
-from pyverilog.dataflow.graphgen import VerilogGraphGenerator
-import pygraphviz as pgv
 import pyslang as ps
 from helpers.slang_helpers import SlangSymbolVisitor, SlangNodeVisitor, SymbolicDFS
 import redis
@@ -43,7 +33,6 @@ logging.debug("Starting over")
 
 
 INFO = "Verilog Symbolic Execution Engine"
-VERSION = pyverilog.__version__
 USAGE = "Usage: python3 -m main <num_cycles> <verilog_file>.v > out.txt"
     
 def timeout_exit():

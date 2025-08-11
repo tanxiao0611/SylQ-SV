@@ -4,8 +4,11 @@ cases in the designs we evaluate. Please open a Github issue if you run into a d
 rvalue not handled by this."""
 
 import sys
-from pyverilog.vparser.ast import Rvalue, Eq, Cond, Pointer, UnaryOperator, Operator, IdentifierScope, Identifier, StringConst, Partselect, Repeat
-from pyverilog.vparser.ast import Concat, IntConst
+# from pyverilog.vparser.ast import Rvalue, Eq, Cond, Pointer, UnaryOperator, Operator, IdentifierScope, Identifier, StringConst, Partselect, Repeat
+# from pyverilog.vparser.ast import Concat, IntConst
+
+# Use pyslang equivalents for SystemVerilog expressions:
+import pyslang as ps
 from engine.execution_manager import ExecutionManager
 from engine.symbolic_state import SymbolicState
 from z3 import If, BitVec, IntVal, Int2BV, BitVecVal
@@ -23,106 +26,105 @@ op_map = {"Plus": "+", "Minus": "-", "Power": "**", "Times": "*", "Divide": "/",
 
 def conjunction_with_pointers(rvalue, s: SymbolicState, m: ExecutionManager) -> str: 
     """Convert the compound rvalue into proper string representation with pointers taken into account."""
-    if isinstance(rvalue, UnaryOperator):
-        operator = str(rvalue).split(" ")[0][1:]
-        if isinstance(rvalue.right, Pointer):
-            new_right = f"({operator} {rvalue.right.var}[{rvalue.right.ptr}])"
+    if isinstance(rvalue, ps.UnaryExpressionSyntax):
+        operator = str(rvalue.operator)
+        if isinstance(rvalue.operand, ps.ElementSelectExpressionSyntax):
+            new_right = f"({operator} {rvalue.operand.value}[{rvalue.operand.selector}])"
             return new_right
         else: 
-            return f"({operator} {conjunction_with_pointers(rvalue.right, s, m)})"
-    elif isinstance(rvalue, Repeat):
-        if isinstance(rvalue.times, IntConst):
-            times_int = int(rvalue.times.value)
+            return f"({operator} {conjunction_with_pointers(rvalue.operand, s, m)})"
+    elif isinstance(rvalue, ps.RepeatExpressionSyntax):
+        if isinstance(rvalue.count, ps.IntegerLiteralExpressionSyntax):
+            times_int = int(rvalue.count.value)
         else:
-            times = evaluate(parse_tokens(tokenize(conjunction_with_pointers(rvalue.times, s, m), s, m)), s, m)
+            times = evaluate(parse_tokens(tokenize(conjunction_with_pointers(rvalue.count, s, m), s, m)), s, m)
             times_int = int(str_to_int(times, s, m))
         accumulate = "("
         val = conjunction_with_pointers(rvalue.value, s, m) 
         for i in range(times_int):
             accumulate += str(val) + " "
-        accumulate.rstrip()
+        accumulate = accumulate.rstrip()
         accumulate += ")"
         return accumulate
-    elif isinstance(rvalue, Cond):
-        if isinstance(rvalue.true_value, Pointer) and isinstance(rvalue.false_value, Pointer):
-            if isinstance(rvalue.false_value.ptr, Operator):
-                inside_brackets = conjunction_with_pointers(rvalue.false_value.ptr, s, m)
-                ptr_access_f = f"{rvalue.false_value.var}[{inside_brackets}]"
+    elif isinstance(rvalue, ps.ConditionalExpressionSyntax):
+        if isinstance(rvalue.ifTrue, ps.ElementSelectExpressionSyntax) and isinstance(rvalue.ifFalse, ps.ElementSelectExpressionSyntax):
+            if isinstance(rvalue.ifFalse.selector, ps.BinaryExpressionSyntax):
+                inside_brackets = conjunction_with_pointers(rvalue.ifFalse.selector, s, m)
+                ptr_access_f = f"{rvalue.ifFalse.value}[{inside_brackets}]"
             else:
-                ptr_access_f = f"{rvalue.false_value.var}[{rvalue.false_value.ptr}]"
-            s.store[m.curr_module][ptr_access_f] = s.store[m.curr_module][rvalue.false_value.var.name]
-            if isinstance(rvalue.true_value.ptr, Operator):
-                inside_brackets = conjunction_with_pointers(rvalue.true_value.ptr, s, m)
-                ptr_access_t = f"{rvalue.true_value.var}[{inside_brackets}]"
+                ptr_access_f = f"{rvalue.ifFalse.value}[{rvalue.ifFalse.selector}]"
+            s.store[m.curr_module][ptr_access_f] = s.store[m.curr_module][rvalue.ifFalse.value.name]
+            if isinstance(rvalue.ifTrue.selector, ps.BinaryExpressionSyntax):
+                inside_brackets = conjunction_with_pointers(rvalue.ifTrue.selector, s, m)
+                ptr_access_t = f"{rvalue.ifTrue.value}[{inside_brackets}]"
             else:
-                ptr_access_t = f"{rvalue.true_value.var}[{rvalue.true_value.ptr}]"
-            s.store[m.curr_module][ptr_access_t] = s.store[m.curr_module][rvalue.true_value.var.name]
-            return f"(Cond {conjunction_with_pointers(rvalue.cond, s, m)} {ptr_access_t} {ptr_access_f})"
-        elif isinstance(rvalue.false_value, Pointer):
-            if isinstance(rvalue.false_value.ptr, Operator):
-                inside_brackets = conjunction_with_pointers(rvalue.false_value.ptr, s, m)
-                ptr_access = f"{rvalue.false_value.var}[{inside_brackets}]"
+                ptr_access_t = f"{rvalue.ifTrue.value}[{rvalue.ifTrue.selector}]"
+            s.store[m.curr_module][ptr_access_t] = s.store[m.curr_module][rvalue.ifTrue.value.name]
+            return f"(Cond {conjunction_with_pointers(rvalue.predicate, s, m)} {ptr_access_t} {ptr_access_f})"
+        elif isinstance(rvalue.ifFalse, ps.ElementSelectExpressionSyntax):
+            if isinstance(rvalue.ifFalse.selector, ps.BinaryExpressionSyntax):
+                inside_brackets = conjunction_with_pointers(rvalue.ifFalse.selector, s, m)
+                ptr_access = f"{rvalue.ifFalse.value}[{inside_brackets}]"
             else:
-                ptr_access = f"{rvalue.false_value.var}[{rvalue.false_value.ptr}]"
-            s.store[m.curr_module][ptr_access] = s.store[m.curr_module][rvalue.false_value.var.name]
-            return f"(Cond {conjunction_with_pointers(rvalue.cond, s, m)} {rvalue.true_value} {ptr_access})"
-        elif isinstance(rvalue.true_value, Pointer):
-            if isinstance(rvalue.true_value.ptr, Operator):
-                inside_brackets = conjunction_with_pointers(rvalue.true_value.ptr, s, m)
-                ptr_access = f"{rvalue.true_value.var}[{inside_brackets}]"
+                ptr_access = f"{rvalue.ifFalse.value}[{rvalue.ifFalse.selector}]"
+            s.store[m.curr_module][ptr_access] = s.store[m.curr_module][rvalue.ifFalse.value.name]
+            return f"(Cond {conjunction_with_pointers(rvalue.predicate, s, m)} {rvalue.ifTrue} {ptr_access})"
+        elif isinstance(rvalue.ifTrue, ps.ElementSelectExpressionSyntax):
+            if isinstance(rvalue.ifTrue.selector, ps.BinaryExpressionSyntax):
+                inside_brackets = conjunction_with_pointers(rvalue.ifTrue.selector, s, m)
+                ptr_access = f"{rvalue.ifTrue.value}[{inside_brackets}]"
             else:
-                ptr_access = f"{rvalue.true_value.var}[{rvalue.true_value.ptr}]"
-            s.store[m.curr_module][ptr_access] = s.store[m.curr_module][rvalue.true_value.var.name]
-            return f"(Cond {conjunction_with_pointers(rvalue.cond, s, m)} {ptr_access} {conjunction_with_pointers(rvalue.false_value, s, m)})"
+                ptr_access = f"{rvalue.ifTrue.value}[{rvalue.ifTrue.selector}]"
+            s.store[m.curr_module][ptr_access] = s.store[m.curr_module][rvalue.ifTrue.value.name]
+            return f"(Cond {conjunction_with_pointers(rvalue.predicate, s, m)} {ptr_access} {conjunction_with_pointers(rvalue.ifFalse, s, m)})"
         else:
-            return f"(Cond {conjunction_with_pointers(rvalue.cond, s, m)} {conjunction_with_pointers(rvalue.true_value, s, m)} {conjunction_with_pointers(rvalue.false_value, s, m)})"
-    elif isinstance(rvalue, Operator):
-        operator = str(rvalue).split(" ")[0][1:]
-        if isinstance(rvalue.left, Pointer) and isinstance(rvalue.right, Pointer):
-            new_left = f"{rvalue.left.var}[{rvalue.left.ptr}]"
-            new_right = f"{rvalue.right.var}[{rvalue.right.ptr}]"
-            if isinstance(rvalue.left.ptr, Operator):
-                expr_in_brackets = conjunction_with_pointers(rvalue.left.ptr, s, m)
-                new_left = f"{rvalue.left.var}[ {expr_in_brackets} ]"
-            if isinstance(rvalue.right.ptr, Operator):
-                expr_in_brackets = conjunction_with_pointers(rvalue.right.ptr, s, m)
-                new_right = f"{rvalue.right.var}[ {expr_in_brackets} ]"
-            s.store[m.curr_module][new_right] = s.store[m.curr_module][rvalue.right.var.name]
-            s.store[m.curr_module][new_left] = s.store[m.curr_module][rvalue.left.var.name]
+            return f"(Cond {conjunction_with_pointers(rvalue.predicate, s, m)} {conjunction_with_pointers(rvalue.ifTrue, s, m)} {conjunction_with_pointers(rvalue.ifFalse, s, m)})"
+    elif isinstance(rvalue, ps.BinaryExpressionSyntax):
+        operator = str(rvalue.operator)
+        if isinstance(rvalue.left, ps.ElementSelectExpressionSyntax) and isinstance(rvalue.right, ps.ElementSelectExpressionSyntax):
+            new_left = f"{rvalue.left.value}[{rvalue.left.selector}]"
+            new_right = f"{rvalue.right.value}[{rvalue.right.selector}]"
+            if isinstance(rvalue.left.selector, ps.BinaryExpressionSyntax):
+                expr_in_brackets = conjunction_with_pointers(rvalue.left.selector, s, m)
+                new_left = f"{rvalue.left.value}[ {expr_in_brackets} ]"
+            if isinstance(rvalue.right.selector, ps.BinaryExpressionSyntax):
+                expr_in_brackets = conjunction_with_pointers(rvalue.right.selector, s, m)
+                new_right = f"{rvalue.right.value}[ {expr_in_brackets} ]"
+            s.store[m.curr_module][new_right] = s.store[m.curr_module][rvalue.right.value.name]
+            s.store[m.curr_module][new_left] = s.store[m.curr_module][rvalue.left.value.name]
             return f"({operator} {new_left} {new_right})"
-        elif isinstance(rvalue.left, Pointer):
-            new_left = f"{rvalue.left.var}[{rvalue.left.ptr}]"
-            # make a new value in store for the pointer
+        elif isinstance(rvalue.left, ps.ElementSelectExpressionSyntax):
+            new_left = f"{rvalue.left.value}[{rvalue.left.selector}]"
             new_left_s = None
-            if isinstance(rvalue.left.ptr, Operator):
-                expr_in_brackets = conjunction_with_pointers(rvalue.left.ptr, s, m)
-                new_left_s = f"{rvalue.left.var}[ {evaluate(parse_tokens(tokenize(expr_in_brackets, s, m)), s, m)} ]"
-                new_left = f"{rvalue.left.var}[ {(expr_in_brackets)} ]"
-            if not new_left_s is None:
-                s.store[m.curr_module][new_left_s] = s.store[m.curr_module][rvalue.left.var.name]
+            if isinstance(rvalue.left.selector, ps.BinaryExpressionSyntax):
+                expr_in_brackets = conjunction_with_pointers(rvalue.left.selector, s, m)
+                new_left_s = f"{rvalue.left.value}[ {evaluate(parse_tokens(tokenize(expr_in_brackets, s, m)), s, m)} ]"
+                new_left = f"{rvalue.left.value}[ {(expr_in_brackets)} ]"
+            if new_left_s is not None:
+                s.store[m.curr_module][new_left_s] = s.store[m.curr_module][rvalue.left.value.name]
             else:
-                s.store[m.curr_module][new_left] = s.store[m.curr_module][rvalue.left.var.name]
+                s.store[m.curr_module][new_left] = s.store[m.curr_module][rvalue.left.value.name]
             return f"({operator} {new_left} {conjunction_with_pointers(rvalue.right, s, m)})"
-        elif isinstance(rvalue.right, Pointer):
-            new_right = f"{rvalue.right.var}[{rvalue.right.ptr}]"
-            if isinstance(rvalue.right.ptr, Operator):
-                expr_in_brackets = conjunction_with_pointers(rvalue.right.ptr, s, m)
-                new_right = f"{rvalue.right.var}[ {expr_in_brackets} ]"
-            s.store[m.curr_module][new_right] = s.store[m.curr_module][rvalue.right.var.name]
+        elif isinstance(rvalue.right, ps.ElementSelectExpressionSyntax):
+            new_right = f"{rvalue.right.value}[{rvalue.right.selector}]"
+            if isinstance(rvalue.right.selector, ps.BinaryExpressionSyntax):
+                expr_in_brackets = conjunction_with_pointers(rvalue.right.selector, s, m)
+                new_right = f"{rvalue.right.value}[ {expr_in_brackets} ]"
+            s.store[m.curr_module][new_right] = s.store[m.curr_module][rvalue.right.value.name]
             return f"({operator} {conjunction_with_pointers(rvalue.left, s, m)} {new_right})"
-        elif isinstance(rvalue.right, Partselect) and isinstance(rvalue.left, Partselect):
-            new_right = f"{rvalue.right.var.name}[{rvalue.right.msb}:{rvalue.right.lsb}]"
-            new_left = f"{rvalue.left.var.name}[{rvalue.left.msb}:{rvalue.left.lsb}]"
+        elif isinstance(rvalue.right, ps.RangeSelectExpressionSyntax) and isinstance(rvalue.left, ps.RangeSelectExpressionSyntax):
+            new_right = f"{rvalue.right.value.name}[{rvalue.right.left}:{rvalue.right.right}]"
+            new_left = f"{rvalue.left.value.name}[{rvalue.left.left}:{rvalue.left.right}]"
             return f"({operator} {new_left} {new_right})"
-        elif isinstance(rvalue.right, Partselect):
-            new_right = f"{rvalue.right.var.name}[{rvalue.right.msb}:{rvalue.right.lsb}]"
+        elif isinstance(rvalue.right, ps.RangeSelectExpressionSyntax):
+            new_right = f"{rvalue.right.value.name}[{rvalue.right.left}:{rvalue.right.right}]"
             return f"({operator} {conjunction_with_pointers(rvalue.left, s, m)} {new_right})"
-        elif isinstance(rvalue.left, Partselect):
-            new_left = f"{rvalue.left.var.name}[{rvalue.left.msb}:{rvalue.left.lsb}]"
+        elif isinstance(rvalue.left, ps.RangeSelectExpressionSyntax):
+            new_left = f"{rvalue.left.value.name}[{rvalue.left.left}:{rvalue.left.right}]"
             return f"({operator} {new_left} {conjunction_with_pointers(rvalue.right, s, m)} )"
-        elif isinstance(rvalue.left, Identifier):
+        elif isinstance(rvalue.left, ps.IdentifierNameSyntax):
             module_name = ""
-            if not rvalue.left.scope is None:
+            if hasattr(rvalue.left, "scope") and rvalue.left.scope is not None:
                 module_name = rvalue.left.scope.labellist[0].name
             new_left = f"{rvalue.left.name}"
             if module_name != "":
@@ -131,21 +133,27 @@ def conjunction_with_pointers(rvalue, s: SymbolicState, m: ExecutionManager) -> 
                 return f"({operator} {new_left} {conjunction_with_pointers(rvalue.right, s, m)})"
         else: 
             return f"({operator} {conjunction_with_pointers(rvalue.left, s, m)} {conjunction_with_pointers(rvalue.right, s, m)})" 
-    elif isinstance(rvalue, Pointer):
-        if isinstance(rvalue.ptr, Operator):
-            expr_in_brackets = conjunction_with_pointers(rvalue.left.ptr, s, m)
-            return f"{rvalue.var}[ {expr_in_brackets} ]"
-        return f"{rvalue.var}[{rvalue.ptr}]"
-    elif isinstance(rvalue, Concat):
+    elif isinstance(rvalue, ps.ElementSelectExpressionSyntax):
+        if isinstance(rvalue.selector, ps.BinaryExpressionSyntax):
+            expr_in_brackets = conjunction_with_pointers(rvalue.selector, s, m)
+            return f"{rvalue.value}[ {expr_in_brackets} ]"
+        return f"{rvalue.value}[{rvalue.selector}]"
+    elif isinstance(rvalue, ps.ConcatenationExpressionSyntax):
         accumulate = "("
-        for sub_item in rvalue.list:
+        for sub_item in rvalue.expressions:
             accumulate += str(conjunction_with_pointers(sub_item, s, m)) + " "
-        accumulate.rstrip()
+        accumulate = accumulate.rstrip()
         return accumulate + ")"
-    elif isinstance(rvalue, Partselect):
-        return f"{rvalue.var.name}[{rvalue.msb}:{rvalue.lsb}]"
+    elif isinstance(rvalue, ps.RangeSelectExpressionSyntax):
+        return f"{rvalue.value.name}[{rvalue.left}:{rvalue.right}]"
+    elif isinstance(rvalue, ps.IdentifierNameSyntax):
+        return rvalue.name
+    elif isinstance(rvalue, ps.IntegerLiteralExpressionSyntax):
+        return rvalue.value
+    elif isinstance(rvalue, ps.StringLiteralExpressionSyntax):
+        return rvalue.value
     else:
-        return rvalue
+        return str(rvalue)
 
 def tokenize(rvalue, s: SymbolicState, m: ExecutionManager):
     """Takes a PyVerilog Rvalue expression and splits it into Tokens."""
@@ -361,7 +369,7 @@ def evaluate_cond_expr(cond, true_expr, false_expr, s: SymbolicState, m: Executi
                             accumulate += "(" + evaluate_binary_op(sub_item[1], sub_item[2], op_map[sub_item[0]], s, m) + ")"
                         else:
                             accumulate += str(conjunction_with_pointers(sub_item, s, m)) + " "
-                    accumulate.rstrip()
+                    accumulate = accumulate.rstrip()
                     accumulate += ")"
                 new_cond = None
                 if cond[0] in BINARY_OPS:
@@ -676,7 +684,6 @@ def count_nested_cond(cond, true_value, false_value, s: SymbolicState, m: Execut
 
     else:
         return 1
-    
 
 
-        
+

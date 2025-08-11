@@ -3,10 +3,10 @@ Z3 expressions and solving for assertion violations."""
 
 import z3
 from z3 import Solver, Int, BitVec, Context, BitVecSort, ExprRef, BitVecRef, If, BitVecVal, And, IntVal, Int2BV
-from pyverilog.vparser.ast import Description, ModuleDef, Node, IfStatement, SingleStatement, And, Constant, Rvalue, Plus, Input, Output
-from pyverilog.vparser.ast import WhileStatement, ForStatement, CaseStatement, Block, SystemCall, Land, InstanceList, IntConst, Partselect, Ioport
-from pyverilog.vparser.ast import Value, Reg, Initial, Eq, Identifier, Initial,  NonblockingSubstitution, Decl, Always, Assign, NotEql, Case
-from pyverilog.vparser.ast import Concat, BlockingSubstitution, Parameter, StringConst, Wire, PortArg
+# from pyverilog.vparser.ast import Description, ModuleDef, Node, IfStatement, SingleStatement, And, Constant, Rvalue, Plus, Input, Output
+# from pyverilog.vparser.ast import WhileStatement, ForStatement, CaseStatement, Block, SystemCall, Land, InstanceList, IntConst, Partselect, Ioport
+# from pyverilog.vparser.ast import Value, Reg, Initial, Eq, Identifier, Initial,  NonblockingSubstitution, Decl, Always, Assign, NotEql, Case
+# from pyverilog.vparser.ast import Concat, BlockingSubstitution, Parameter, StringConst, Wire, PortArg
 from helpers.rvalue_parser import parse_tokens, tokenize
 from engine.execution_manager import ExecutionManager
 from engine.symbolic_state import SymbolicState
@@ -242,7 +242,7 @@ def parse_concat_to_Z3(concat, s: SymbolicState, m: ExecutionManager):
     return res
 
 
-def parse_expr_to_Z3(e: Value, s: SymbolicState, m: ExecutionManager):
+def parse_expr_to_Z3(e: ps.ExpressionSyntax, s: SymbolicState, m: ExecutionManager):
     """Takes in a complex Verilog Expression and converts it to 
     a Z3 query."""
     tokens_list = parse_tokens(tokenize(e, s, m))

@@ -1,10 +1,5 @@
 import z3
 from z3 import Solver, Int, BitVec, Context, BitVecSort, ExprRef, BitVecRef, If, BitVecVal, And
-from pyverilog.vparser.parser import parse
-from pyverilog.vparser.ast import Description, ModuleDef, Node, IfStatement, SingleStatement, And, Constant, Rvalue, Plus, Input, Output
-from pyverilog.vparser.ast import WhileStatement, ForStatement, CaseStatement, Block, SystemCall, Land, InstanceList, IntConst, Partselect, Ioport
-from pyverilog.vparser.ast import Value, Reg, Initial, Eq, Identifier, Initial,  NonblockingSubstitution, Decl, Always, Assign, NotEql, Case, Pointer
-from pyverilog.vparser.ast import Concat, BlockingSubstitution, Parameter, StringConst, Wire, PortArg, Instance
 from .execution_manager import ExecutionManager
 from .symbolic_state import SymbolicState
 from .cfg import CFG
@@ -21,10 +16,17 @@ from helpers.utils import to_binary
 from strategies.dfs import DepthFirst
 import sys
 from copy import deepcopy
+import pyslang as ps
 from helpers.slang_helpers import get_module_name, init_state
 
-CONDITIONALS = (IfStatement, ForStatement, WhileStatement, CaseStatement)
-
+CONDITIONALS = (
+    ps.ConditionalStatementSyntax,
+    ps.CaseStatementSyntax,
+    ps.ForeachLoopStatementSyntax,
+    ps.ForLoopStatementSyntax,
+    ps.LoopStatementSyntax,
+    ps.DoWhileStatementSyntax
+)
 class ExecutionEngine:
     module_depth: int = 0
     search_strategy = DepthFirst()
@@ -373,7 +375,7 @@ class ExecutionEngine:
 
 
 
-    def init_run(self, m: ExecutionManager, module: ModuleDef) -> None:
+    def init_run(self, m: ExecutionManager, module) -> None:
         """Initalize run."""
         m.init_run_flag = True
         # come back to this stuff 
@@ -408,7 +410,7 @@ class ExecutionEngine:
                 for i in range(manager.child_num_paths[child]):
                     manager.seen_mod[child][(to_binary(i))] = {}
 
-    def piece_wise_execute(self, ast: ModuleDef, manager: Optional[ExecutionManager], modules) -> None:
+    def piece_wise_execute(self, ast, manager: Optional[ExecutionManager], modules) -> None:
         """Drives symbolic execution piecewise when number of paths is too large not to breakup. 
         We break it up to avoid the memory blow up."""
         self.module_depth += 1
@@ -537,7 +539,7 @@ class ExecutionEngine:
             #print(f" finishing {ast.name}")
             self.module_depth -= 1
 
-    def multicycle_helper(self, ast: ModuleDef, modules_dict, paths,  s: SymbolicState, manager: ExecutionManager, num_cycles: int) -> None:
+    def multicycle_helper(self, ast, modules_dict, paths,  s: SymbolicState, manager: ExecutionManager, num_cycles: int) -> None:
         """Recursive Helper to resolve multi cycle execution."""
         #TODO: Add in the merging state element to this helper function
         for a in range(num_cycles):
@@ -793,7 +795,7 @@ class ExecutionEngine:
         self.module_depth -= 1
 
     #@profile     
-    def execute(self, ast: ModuleDef, modules, manager: Optional[ExecutionManager], directives, num_cycles: int) -> None:
+    def execute(self, ast, modules, manager: Optional[ExecutionManager], directives, num_cycles: int) -> None:
         """Drives symbolic execution."""
         gc.collect()
         print(f"Executing for {num_cycles} clock cycles")
@@ -1038,7 +1040,7 @@ class ExecutionEngine:
         self.module_depth -= 1
 
 
-    def execute_child(self, ast: ModuleDef, state: SymbolicState, manager: Optional[ExecutionManager]) -> None:
+    def execute_child(self, ast, state: SymbolicState, manager: Optional[ExecutionManager]) -> None:
         """Drives symbolic execution of child modules."""
         # different manager
         # same state

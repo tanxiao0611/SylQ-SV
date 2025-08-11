@@ -3,7 +3,6 @@ are some other methods here that may be helpful, too."""
 
 import z3
 from z3 import Solver, Int, BitVec, BitVecSort
-from pyverilog.vparser.ast import Pointer
 
 class SymbolicState:
     pc = Solver()
