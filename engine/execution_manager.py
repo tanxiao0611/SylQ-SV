@@ -2,11 +2,6 @@
 a lot of this information will probably be useful when working in a specific search strategy."""
 from __future__ import annotations
 from .symbolic_state import SymbolicState
-# from pyverilog.vparser.ast import ModuleDef
-# from pyverilog.vparser.ast import Description, ModuleDef, Node, IfStatement, SingleStatement, And, Constant, Rvalue, Plus, Input, Output
-# from pyverilog.vparser.ast import WhileStatement, ForStatement, CaseStatement, Block, SystemCall, Land, InstanceList, IntConst, Partselect, Ioport
-# from pyverilog.vparser.ast import Value, Reg, Initial, Eq, Identifier, Initial,  NonblockingSubstitution, Decl, Always, Assign, NotEql, Case
-# from pyverilog.vparser.ast import Concat, BlockingSubstitution, Parameter, StringConst, Wire, PortArg
 from helpers.utils import init_symbol
 from typing import Optional
 # import pkg_resources

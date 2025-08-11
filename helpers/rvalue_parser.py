@@ -4,8 +4,6 @@ cases in the designs we evaluate. Please open a Github issue if you run into a d
 rvalue not handled by this."""
 
 import sys
-# from pyverilog.vparser.ast import Rvalue, Eq, Cond, Pointer, UnaryOperator, Operator, IdentifierScope, Identifier, StringConst, Partselect, Repeat
-# from pyverilog.vparser.ast import Concat, IntConst
 
 # Use pyslang equivalents for SystemVerilog expressions:
 import pyslang as ps

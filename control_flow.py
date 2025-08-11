@@ -7,16 +7,9 @@ from optparse import OptionParser
 # the next line can be removed after installation
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pyverilog
-import pyverilog.utils.util as util
-from pyverilog.dataflow.dataflow_analyzer import VerilogDataflowAnalyzer
-from pyverilog.dataflow.optimizer import VerilogDataflowOptimizer
-from pyverilog.controlflow.controlflow_analyzer import VerilogControlflowAnalyzer
-
 
 def main():
     INFO = "Control-flow analyzer for Verilog definitions"
-    VERSION = pyverilog.__version__
     USAGE = "Usage: python example_controlflow_analyzer.py -t TOPMODULE file ..."
 
     def showVersion():

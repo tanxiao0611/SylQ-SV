@@ -1,7 +1,6 @@
 """This file is the entrypoint of the execution."""
 from __future__ import absolute_import
 from __future__ import print_function
-#import pyverilog
 import z3
 from z3 import Solver, Int, BitVec, Context, BitVecSort, ExprRef, BitVecRef, If, BitVecVal, And
 import sys
