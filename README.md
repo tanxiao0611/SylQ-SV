@@ -6,6 +6,10 @@
 * Python3: 3.9 or later
 
 ## Getting Started
+Clone the repo, including the submodules:
+
+`git clone --recursive https://github.com/HWSec-UNC/SylQ-SV.git`
+
 Install dependencies:
 * pySlang 7.0: `python3 -m pip install pyslang`
 * Redis 7.4: run `python3 -m pip install redis`
