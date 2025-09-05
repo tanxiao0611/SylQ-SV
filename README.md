@@ -12,7 +12,7 @@ Clone the repo, including the submodules:
 
 Install dependencies:
 * pySlang 7.0: `python3 -m pip install pyslang`
-* Redis 6.2 or later: run `python3 -m pip install redis`
+* Redis 7.4: run `python3 -m pip install redis`
 * z3: run `python3 -m pip install z3-solver`
 * Icarus Verilog: 10.1 or later: run `sudo apt install iverilog`
 * Jinja 2.10 or later: run `python3 -m pip install jinja2`
