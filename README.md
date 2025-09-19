@@ -8,7 +8,7 @@
 ## Getting Started
 Clone the repo, including the submodules:
 
-`git clone --recursive https://github.com/HWSec-UNC/SylQ-SV.git`
+`git clone --recurse-submodules https://github.com/HWSec-UNC/SylQ-SV.git`
 
 Install dependencies:
 * pySlang 7.0: `python3 -m pip install pyslang`
