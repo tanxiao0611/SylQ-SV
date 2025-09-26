@@ -114,7 +114,7 @@ class ExecutionManager:
                 self.count_conditionals(m, item)
         elif items is not None:
             # Check for each conditional type and recurse into their bodies
-            if isinstance(items, ps.IfStatementSyntax):
+            if isinstance(items, ps.ConditionalStatementSyntax):
                 m.num_paths += 1
                 self.count_conditionals(m, items.ifTrue)
                 if items.ifFalse is not None:
@@ -157,8 +157,8 @@ class ExecutionManager:
         if hasattr(stmts, '__iter__'):
             for item in stmts:
                 if isinstance(item, CONDITIONALS):
-                    if isinstance(item, ps.IfStatementSyntax) or isinstance(item, ps.CaseStatementSyntax):
-                        if isinstance(item, ps.IfStatementSyntax):
+                    if isinstance(item, ps.ConditionalStatementSyntax) or isinstance(item, ps.CaseStatementSyntax):
+                        if isinstance(item, ps.ConditionalStatementSyntax):
                             return self.count_conditionals_2(m, item.ifTrue) + self.count_conditionals_2(m, item.ifFalse)  + 1
                         if isinstance(items, ps.CaseStatementSyntax):
                             return self.count_conditionals_2(m, items.items) + 1
@@ -169,7 +169,7 @@ class ExecutionManager:
                 elif hasattr(ps, "InitialConstructSyntax") and isinstance(item, ps.InitialConstructSyntax):
                     return self.count_conditionals_2(m, item.statement)
         elif items is not None:
-            if isinstance(items, ps.IfStatementSyntax):
+            if isinstance(items, ps.ConditionalStatementSyntax):
                 return  ( self.count_conditionals_2(m, items.ifTrue) + 
                 self.count_conditionals_2(m, items.ifFalse)) + 1
             if isinstance(items, ps.CaseStatementSyntax):

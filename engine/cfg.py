@@ -150,28 +150,28 @@ class CFG:
                         self.submodules.append(item)
                     ...
         elif ast != None:
-            if isinstance(ast, IfStatement):
-                self.get_always(m, s, ast.true_statement) 
-                self.get_always(m, s, ast.false_statement)
-            elif isinstance(ast, CaseStatement):
-                self.get_always(m, s, ast.caselist)
-            elif isinstance(ast, ForStatement):
-                self.get_always(m, s, ast.statement)
-            elif isinstance(ast, Block):
-                self.get_always(m, s, ast.items)
-            elif isinstance(ast, Always):
+            if isinstance(ast, ps.ConditionalStatementSyntax):
+                self.get_always(m, s, ast.ifTrue) 
+                self.get_always(m, s, ast.ifFalse)
+            elif isinstance(ast, ps.CaseStatementSyntax):
+                self.get_always(m, s, ast.caseStatements)
+            elif isinstance(ast, ps.ForLoopStatementSyntax):
+                self.get_always(m, s, ast.body)
+            elif isinstance(ast, ps.BlockStatementSyntax):
+                self.get_always(m, s, ast.statements)
+            elif isinstance(ast, ps.ProceduralBlockSyntax):
                 self.always_blocks.append(ast)          
-            elif isinstance(ast, Initial):
-                self.get_always(m, s, ast.statement)
-            elif isinstance(ast, SingleStatement):
+            # elif isinstance(ast, ps.InitialConstructSyntax):
+            #     self.get_always(m, s, ast.statement)
+            elif isinstance(ast, ps.StatementSyntax):
                 self.get_always(m, s, ast.statement)
             else:
-                if isinstance(ast, Decl):
+                if isinstance(ast, ps.DataDeclarationSyntax):
                     self.decls.append(ast)
-                elif isinstance(ast, Assign):
+                elif isinstance(ast, ps.ContinuousAssignSyntax):
                     self.comb.append(ast)
-                elif isinstance(ast, InstanceList):
-                    print("FOUND SUBModule!")
+                # elif isinstance(ast, ps.HierarchicalReference):
+                #     print("FOUND SUBModule!")
                 ...
 
     def get_always(self, m: ExecutionManager, s: SymbolicState, ast):

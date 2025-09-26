@@ -316,34 +316,81 @@ class ExecutionEngine:
         return False
 
     def module_count_sv(self, m: ExecutionManager, items) -> None:
-        """Traverse a top level module and count up the instances of each type of module
-        for SystemVerilog."""
-        # TODO need to figure out what the node type is for instances
-        # TODO do this check for the other block types
-        if items.__class__.__name__ == "ProceduralBlockSyntax":
-            items = items.statement.statements
-        if hasattr(items, '__iter__'):
-            for item in items:
-                if isinstance(item, InstanceList):
-                    self.module_count(m, item.instances)
-                elif isinstance(item, Instance):
-                    if item.module in m.instance_count:
-                        m.instance_count[item.module] += 1
-                        ...
+        """Traverse a top level SystemVerilog module (pyslang AST) and count instances.
+
+        This implementation uses duck-typing and classname checks so it is robust
+        across pyslang node variants. It attempts to find instantiation nodes
+        and increment m.instance_count[module_name].
+        """
+        if items is None:
+            return
+
+        # If it's a plain list/tuple of nodes, recurse over each element
+        if isinstance(items, (list, tuple)):
+            for it in items:
+                self.module_count_sv(m, it)
+            return
+
+        # Normalize access: many pyslang nodes wrap a single statement under .statement
+        # e.g., ProceduralBlockSyntax -> .statement; handle that first.
+        cname = items.__class__.__name__ if hasattr(items, '__class__') else ''
+        if cname == "ProceduralBlockSyntax" and hasattr(items, 'statement'):
+            self.module_count_sv(m, items.statement)
+            return
+
+        # If the node exposes an `instances` collection (common for instantiation lists),
+        # traverse it first so nested instance lists are handled.
+        if hasattr(items, 'instances'):
+            self.module_count_sv(m, items.instances)
+
+        # Heuristic: if the class name suggests an instantiation/instance, try to extract module name
+        lower_name = cname.lower()
+        if 'instance' in lower_name or 'instantiat' in lower_name or 'moduleinst' in lower_name:
+            # Try a set of common attribute names that may hold the referenced module name/object
+            mod_name = None
+            for attr in ('module', 'module_name', 'moduleName', 'module_identifier',
+                         'moduleReference', 'module_ref', 'moduleIdentifier', 'moduleType',
+                         'type'):
+                if hasattr(items, attr):
+                    val = getattr(items, attr)
+                    if val is None:
+                        continue
+                    if isinstance(val, str):
+                        mod_name = val
                     else:
-                        m.instance_count[item.module] = 1
-                if item.__class__.__name__ == "ProceduralBlockSyntax":
-                    # Always Block
-                    self.module_count(m, item.statement.statement.items)           
-                elif isinstance(item, Initial):
-                    self.module_count(m, item.statement)
-        elif items != None:
-                if isinstance(items, InstanceList):
-                    if items.module in m.instance_count:
-                        m.instance_count[items.module] += 1
-                    else:
-                        m.instance_count[items.module] = 1
-                    self.module_count(m, items.instances)
+                        # attempt to extract a name from an identifier node
+                        mod_name = getattr(val, 'name', None) or getattr(val, 'identifier', None) or str(val)
+                    break
+
+            # If we couldn't find a direct attribute, some pyslang instantiation nodes
+            # keep the module reference under a nested template like `.module` or `.moduleName`
+            if not mod_name:
+                # inspect all attributes for something that looks like a module identifier
+                for a in dir(items):
+                    if 'module' in a.lower() or 'instance' in a.lower():
+                        val = getattr(items, a)
+                        if isinstance(val, str):
+                            mod_name = val
+                            break
+                        if hasattr(val, 'name'):
+                            mod_name = getattr(val, 'name')
+                            break
+
+            if mod_name:
+                m.instance_count[mod_name] = m.instance_count.get(mod_name, 0) + 1
+
+            # If the instantiation node also contains nested children, traverse them
+            for child_attr in ('items', 'statements', 'statement', 'instances', 'children', 'body'):
+                if hasattr(items, child_attr):
+                    self.module_count_sv(m, getattr(items, child_attr))
+            return
+
+        # Otherwise, descend into common container attributes to find nested instantiations
+        for attr in ('items', 'statements', 'body', 'statement', 'declarationList', 'declarations'):
+            if hasattr(items, attr):
+                child = getattr(items, attr)
+                if child is not None:
+                    self.module_count_sv(m, child)
 
     def module_count(self, m: ExecutionManager, items) -> None:
         """Traverse a top level module and count up the instances of each type of module."""

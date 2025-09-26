@@ -1015,7 +1015,7 @@ class SlangNodeVisitor:
             print("ADD ASSIGNMENT EXPRESSION")
         elif node.kind == ps.SyntaxKind.AddExpression:
             print("ADD EXPRESSION")
-        elif node.kind == ps.SyntaxKind.AlwaysBlock:
+        elif node.kind == ps.SyntaxKind.ProceduralBlockSyntax:
             print("ALWAYS BLOCK")
         elif node.kind == ps.SyntaxKind.AlwaysCombBlock:
             print("ALWAYS COMB BLOCK")
