@@ -128,7 +128,14 @@ def main():
         
         compilation = driver.createCompilation()
         modules =  compilation.getDefinitions()
-        successful_compilation = driver.reportCompilation(compilation, False)
+
+        #TODO
+        #IF using pyslang 7.0, uncomment the followingl line and comment out the other successful_compilation
+        #successful_compilation = driver.reportCompilation(compilation, False)
+
+        #IF using pyslang 9.0/9.1, use this version of successful_compilation
+        successful_compilation = driver.runFullCompilation(False)
+        
         if successful_compilation:
             #print(driver.reportMacros())
             my_visitor_for_symbol = SymbolicDFS(num_cycles)
