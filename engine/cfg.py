@@ -150,6 +150,10 @@ class CFG:
                         self.submodules.append(item)
                     ...
         elif ast != None:
+            print(f"ast ! {ast.getKindString()} {dir(ast)}")
+            if isinstance(ast, ps.DefinitionKind):
+                # TODO: This is not working anymore
+                print("module kind")
             if isinstance(ast, ps.ConditionalStatementSyntax):
                 self.get_always(m, s, ast.ifTrue) 
                 self.get_always(m, s, ast.ifFalse)
@@ -230,6 +234,101 @@ class CFG:
                 elif isinstance(ast, InstanceList):
                     print("FOUND SUBModule!")
                 ...
+
+    def basic_blocks_sv(self, m:ExecutionManager, s: SymbolicState, ast):
+        """We want to get a list of AST nodes partitioned into basic blocks.
+        Need to keep track of children/parent indices of each block in the list."""
+        if hasattr(ast, '__iter__'):
+            for item in ast:
+                if self.block_smt[self.block_stmt_depth] and (isinstance(item, ps.ConditionalStatementSyntax) or isinstance(item, ps.CaseStatementSyntax)
+                or isinstance(item, ps.ForStatementSyntax)):
+                    if not self.block_stmt_depth in self.ind_branch_points:
+                        self.ind_branch_points[self.block_stmt_depth] = set()
+
+                    self.ind_branch_points[self.block_stmt_depth].add(self.curr_idx)
+
+                if isinstance(item, ps.ConditionalStatementSyntax):
+                    self.all_nodes.append(item)
+                    self.partition_points.add(self.curr_idx)
+                    parent_idx = self.curr_idx
+                    self.basic_blocks(m, s, item.true_statement) 
+                    edge_1 = (parent_idx, self.curr_idx)
+                    self.partition_points.add(self.curr_idx)
+                    self.basic_blocks(m, s, item.false_statement)
+                    edge_2 = (parent_idx, self.curr_idx)
+                    self.partition_points.add(self.curr_idx)
+                    self.curr_idx += 1
+                    self.edgelist.append(edge_1)
+                    self.edgelist.append(edge_2)
+                elif isinstance(item, ps.CaseStatementSyntax):
+                    self.all_nodes.append(ast)
+                    self.partition_points.add(self.curr_idx)
+                    self.curr_idx += 1
+                    self.basic_blocks(m, s, item.caselist) 
+                elif isinstance(item, ps.ForStatementSyntax):
+                    self.all_nodes.append(ast)
+                    self.partition_points.add(self.curr_idx)
+                    self.curr_idx += 1
+                    self.basic_blocks(m, s, item.statement) 
+                elif isinstance(item, Block):
+                    print("found block stmt")
+                    self.basic_blocks(m, s, item.items)
+                elif isinstance(item, ps.ProceduralBlockSyntax):
+                    self.all_nodes.append(item)
+                    self.curr_idx += 1
+                    self.basic_blocks(m, s, item.statement)             
+                elif isinstance(item, ps.Initial):
+                    self.all_nodes.append(item)
+                    self.curr_idx += 1
+                    self.basic_blocks(m, s, item.statement)
+                else:
+                    self.all_nodes.append(item)
+                    self.curr_idx += 1
+
+        elif ast != None:
+            if isinstance(ast, ps.ConditionalStatementSyntax):
+                self.partition_points.add(self.curr_idx)
+                self.all_nodes.append(ast)
+                parent_idx = self.curr_idx
+                self.curr_idx += 1
+                edge_1 = (parent_idx, self.curr_idx)
+                self.partition_points.add(self.curr_idx)
+                self.basic_blocks(m, s, ast.true_statement) 
+                edge_2 = (parent_idx, self.curr_idx)
+                self.partition_points.add(self.curr_idx)
+                self.basic_blocks(m, s, ast.false_statement)
+                self.edgelist.append(edge_1)
+                self.edgelist.append(edge_2)
+            elif isinstance(ast, ps.CaseStatementSyntax):
+                self.all_nodes.append(ast)
+                self.partition_points.add(self.curr_idx)
+                self.curr_idx += 1
+                self.basic_blocks(m, s, ast.caselist)
+            elif isinstance(ast, ps.ForStatementSyntax):
+                self.all_nodes.append(ast)
+                self.partition_points.add(self.curr_idx)
+                self.curr_idx += 1
+                self.basic_blocks(m, s, ast.statement) 
+            elif isinstance(ast, ps.BlockStatementSyntax):
+                self.block_stmt_depth += 1
+                self.block_smt.append(True)
+                #print("found other block statement")
+                self.basic_blocks(m, s, ast.statements)
+                if self.block_stmt_depth in self.ind_branch_points:
+                    self.resolve_independent_branch_pts(self.block_stmt_depth)
+                self.block_smt.pop()
+                self.block_stmt_depth -= 1
+            elif isinstance(ast, ps.ProceduralBlockSyntax):
+                self.all_nodes.append(ast)
+                self.curr_idx += 1
+                self.basic_blocks(m, s, ast.statement)             
+            elif isinstance(ast, ps.Initial):
+                self.all_nodes.append(ast)
+                self.curr_idx += 1
+                self.basic_blocks(m, s, ast.statement)
+            else:
+                self.all_nodes.append(ast)
+                self.curr_idx += 1
 
     def basic_blocks(self, m:ExecutionManager, s: SymbolicState, ast):
         """We want to get a list of AST nodes partitioned into basic blocks.

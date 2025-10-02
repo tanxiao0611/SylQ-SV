@@ -620,6 +620,7 @@ class ExecutionEngine:
                 self.init_run(sub_manager, module)
                 self.module_count_sv(manager, module) 
                 if sv_module_name in manager.instance_count:
+                    print(f"Module {sv_module_name} has {manager.instance_count[sv_module_name]} instances")
                     manager.instances_seen[sv_module_name] = 0
                     manager.instances_loc[sv_module_name] = ""
                     num_instances = manager.instance_count[sv_module_name]
@@ -631,7 +632,7 @@ class ExecutionEngine:
                         # build X CFGx for the particular module 
                         cfg = CFG()
                         cfg.reset()
-                        cfg.get_always(manager, state, module.items)
+                        cfg.get_always_sv(manager, state, module.items)
                         cfg_count = len(cfg.always_blocks)
                         for k in range(cfg_count):
                             cfg.basic_blocks(manager, state, cfg.always_blocks[k])
@@ -651,6 +652,7 @@ class ExecutionEngine:
                         manager.intermodule_dependencies[instance_name] = {}
                         manager.cond_assigns[instance_name] = {}
                 else: 
+                    print(f"Module {sv_module_name} single instance")
                     manager.names_list.append(sv_module_name)
                     # build X CFGx for the particular module 
                     cfg = CFG()
@@ -726,12 +728,13 @@ class ExecutionEngine:
         single_paths_by_module = {}
         total_paths_by_module = {}
         for module_name in cfgs_by_module:
+            print(f"Module {module_name} has {len(cfgs_by_module[module_name])} always blocks")
             single_paths_by_module[module_name] = list(product(*mapped_paths[module_name].values()))
             total_paths_by_module[module_name] = list(tuple(product(single_paths_by_module[module_name], repeat=int(num_cycles))))
         # {total_paths_by_module}")
         keys, values = zip(*total_paths_by_module.items())
         total_paths = [dict(zip(keys, path)) for path in product(*values)]
-        #print(total_paths)
+        print(f"Total paths: {total_paths}")
         
         #single_paths = list(product(*mapped_paths[manager.curr_module].values()))
         #total_paths = list(tuple(product(single_paths, repeat=int(num_cycles))))
