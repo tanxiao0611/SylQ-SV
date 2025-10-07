@@ -660,17 +660,21 @@ class ExecutionEngine:
                     #cfg.partition_points = []
                     cfg.get_always_sv(manager, state, module)
                     cfg_count = len(cfg.always_blocks)
-                    always_blocks_by_module[sv_module_name] = deepcopy(cfg.always_blocks)
+                    # TODO: resolve deepcopy issue here
+                    always_blocks_by_module[sv_module_name] = cfg.always_blocks
                     for k in range(cfg_count):
-                        cfg.basic_blocks(manager, state, always_blocks_by_module[sv_module_name][k])
+                        cfg.basic_blocks_sv(manager, state, always_blocks_by_module[sv_module_name][k])
                         cfg.partition()
                         # print(cfg.partition_points)
                         # print(len(cfg.basic_block_list))
                         # print(cfg.edgelist)
                         cfg.build_cfg(manager, state)
                         #print(cfg.cfg_edges)
-                        cfg.module_name = ast.name
-                        cfgs_by_module[sv_module_name].append(deepcopy(cfg))
+
+                        #TODO: double-check curr_module starts at the right spot
+                        cfg.module_name = manager.curr_module
+                        # TODO: used to be Deepcopy in Sylvia,too 
+                        cfgs_by_module[sv_module_name].append(cfg)
                         cfg.reset()
                         #print(cfg.paths)
 
