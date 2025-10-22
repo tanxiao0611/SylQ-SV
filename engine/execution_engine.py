@@ -612,7 +612,8 @@ class ExecutionEngine:
             for module in modules:
                 sv_module_name = get_module_name(module)
                 #print(sv_module_name)
-                modules_dict[sv_module_name] = sv_module_name
+                #modules_dict[sv_module_name] = sv_module_name
+                modules_dict[sv_module_name] = module
                 always_blocks_by_module = {sv_module_name: []}
                 manager.seen_mod[sv_module_name] = {}
                 cfgs_by_module[sv_module_name] = []
@@ -624,12 +625,29 @@ class ExecutionEngine:
                     manager.instances_seen[sv_module_name] = 0
                     manager.instances_loc[sv_module_name] = ""
                     num_instances = manager.instance_count[sv_module_name]
+                    #cfgs_by_module.pop(sv_module_name, None)
                     cfgs_by_module.pop(sv_module_name, None)
                     for i in range(num_instances):
                         instance_name = f"{sv_module_name}_{i}"
                         manager.names_list.append(instance_name)
                         cfgs_by_module[instance_name] = []
-                        # build X CFGx for the particular module 
+
+                         # 1) discover always blocks once
+                        probe = CFG()
+                        probe.get_always_sv(manager, state, module)
+
+                        # 2) build a fresh CFG per always block (SV walker)
+                        for ab in probe.always_blocks:
+                            ab_body = getattr(ab, "statement", getattr(ab, "members", ab))
+                            c = CFG()
+                            c.module_name = instance_name
+                            c.basic_blocks_sv(manager, state, ab_body)
+                            c.partition()
+                            c.build_cfg(manager, state)
+                            cfgs_by_module[instance_name].append(c)
+
+
+                        """# build X CFGx for the particular module 
                         cfg = CFG()
                         cfg.reset()
                         cfg.get_always_sv(manager, state, module.items)
@@ -645,14 +663,14 @@ class ExecutionEngine:
                             cfg.module_name = ast.name
 
                             cfgs_by_module[instance_name].append(deepcopy(cfg))
-                            cfg.reset()
+                            cfg.reset()"""
                             #print(cfg.paths)
                         state.store[instance_name] = {}
                         manager.dependencies[instance_name] = {}
                         manager.intermodule_dependencies[instance_name] = {}
                         manager.cond_assigns[instance_name] = {}
                 else: 
-                    print(f"Module {sv_module_name} single instance")
+                    """print(f"Module {sv_module_name} single instance")
                     manager.names_list.append(sv_module_name)
                     # build X CFGx for the particular module 
                     cfg = CFG()
@@ -676,7 +694,27 @@ class ExecutionEngine:
                         # TODO: used to be Deepcopy in Sylvia,too 
                         cfgs_by_module[sv_module_name].append(cfg)
                         cfg.reset()
-                        #print(cfg.paths)
+                        #print(cfg.paths)"""
+                    print(f"Module {sv_module_name} single instance")
+                    manager.names_list.append(sv_module_name)
+                    modules_dict[sv_module_name] = module                 # store AST
+
+                    # discover always blocks once
+                    probe = CFG()
+                    probe.get_always_sv(manager, state, module)
+                    always_blocks_by_module[sv_module_name] = probe.always_blocks
+
+                    # fresh CFG per always (SV walker)
+                    cfgs_by_module[sv_module_name] = []
+                    for ab in always_blocks_by_module[sv_module_name]:
+                        ab_body = getattr(ab, "statement", getattr(ab, "members", ab))
+                        c = CFG()
+                        c.module_name = sv_module_name
+                        c.basic_blocks_sv(manager, state, ab_body)
+                        c.partition()
+                        c.build_cfg(manager, state)
+                        cfgs_by_module[sv_module_name].append(c)
+
 
                     state.store[sv_module_name] = {}
                     manager.dependencies[sv_module_name] = {}
@@ -721,14 +759,18 @@ class ExecutionEngine:
         manager.curr_module = manager.names_list[0]
 
         # index into cfgs list
-        curr_cfg = 0
+        """curr_cfg = 0
         for module_name in cfgs_by_module:
             for cfg in cfgs_by_module[module_name]:
                 mapped_paths[module_name][curr_cfg] = cfg.paths
                 curr_cfg += 1
-            curr_cfg = 0
+            curr_cfg = 0"""
+        for module_name, cfg_list in cfgs_by_module.items():
+            for i, cfg in enumerate(cfg_list):
+                mapped_paths[module_name][i] = cfg.paths
 
-        stride_length = cfg_count
+
+        #stride_length = cfg_count
         single_paths_by_module = {}
         total_paths_by_module = {}
         for module_name in cfgs_by_module:
@@ -756,13 +798,19 @@ class ExecutionEngine:
                 visitor.dfs(modules_dict[module_name])
                 #self.search_strategy.visit_module(manager, state, ast, modules_dict)
                 
-            for cfg_idx in range(cfg_count):
+            """for cfg_idx in range(cfg_count):
                 for node in cfgs_by_module[manager.curr_module][cfg_idx].decls:
                     visitor.dfs(node)
                     #self.search_strategy.visit_stmt(manager, state, node, modules_dict, None)
                 for node in cfgs_by_module[manager.curr_module][cfg_idx].comb:
                     visitor.dfs(node)
-                    #self.search_strategy.visit_stmt(manager, state, node, modules_dict, None) 
+                    #self.search_strategy.visit_stmt(manager, state, node, modules_dict, None) """
+            for c in cfgs_by_module[manager.curr_module]:
+                for node in c.decls:
+                    visitor.dfs(node)
+                for node in c.comb:
+                    visitor.dfs(node)
+
    
             manager.curr_module = manager.names_list[0]
             # makes assumption top level module is first in line
@@ -777,8 +825,10 @@ class ExecutionEngine:
                 manager.curr_module = manager.names_list[modules_seen]
                 manager.cycle = 0
                 for complete_single_cycle_path in curr_path[module_name]:
-                    for cfg_path in complete_single_cycle_path:
-                        directions = cfgs_by_module[module_name][complete_single_cycle_path.index(cfg_path)].compute_direction(cfg_path)
+                    #for cfg_path in complete_single_cycle_path:
+                    for cfg_idx, cfg_path in enumerate(complete_single_cycle_path):
+                        directions = cfgs_by_module[module_name][cfg_idx].compute_direction(cfg_path)
+                        #directions = cfgs_by_module[module_name][complete_single_cycle_path.index(cfg_path)].compute_direction(cfg_path)
                         k: int = 0
                         for basic_block_idx in cfg_path:
                             if basic_block_idx < 0: 
@@ -787,7 +837,8 @@ class ExecutionEngine:
                             else:
                                 direction = directions[k]
                                 k += 1
-                                basic_block = cfgs_by_module[module_name][complete_single_cycle_path.index(cfg_path)].basic_block_list[basic_block_idx]
+                                basic_block = cfgs_by_module[module_name][cfg_idx].basic_block_list[basic_block_idx]
+                                #basic_block = cfgs_by_module[module_name][complete_single_cycle_path.index(cfg_path)].basic_block_list[basic_block_idx]
                                 for stmt in basic_block:
                                     # print(f"updating curr mod {manager.curr_module}")
                                     #self.check_state(manager, state)
@@ -967,15 +1018,18 @@ class ExecutionEngine:
 
         # index into cfgs list
         curr_cfg = 0
-        for module_name in cfgs_by_module:
+        """for module_name in cfgs_by_module:
             for cfg in cfgs_by_module[module_name]:
                 mapped_paths[module_name][curr_cfg] = cfg.paths
                 curr_cfg += 1
-            curr_cfg = 0
+            curr_cfg = 0"""
+        for module_name, cfg_list in cfgs_by_module.items():
+            for i, cfg in enumerate(cfg_list):
+                mapped_paths[module_name][i] = cfg.paths
 
         print(mapped_paths)
 
-        stride_length = cfg_count
+        #stride_length = cfg_count
         single_paths_by_module = {}
         total_paths_by_module = {}
         for module_name in cfgs_by_module:
@@ -1021,8 +1075,10 @@ class ExecutionEngine:
                 manager.curr_module = manager.names_list[modules_seen]
                 manager.cycle = 0
                 for complete_single_cycle_path in curr_path[module_name]:
-                    for cfg_path in complete_single_cycle_path:
-                        directions = cfgs_by_module[module_name][complete_single_cycle_path.index(cfg_path)].compute_direction(cfg_path)
+                    #for cfg_path in complete_single_cycle_path:
+                    for cfg_idx, cfg_path in enumerate(complete_single_cycle_path):
+                        directions = cfgs_by_module[module_name][cfg_idx].compute_direction(cfg_path)
+                        #directions = cfgs_by_module[module_name][complete_single_cycle_path.index(cfg_path)].compute_direction(cfg_path)
                         k: int = 0
                         for basic_block_idx in cfg_path:
                             if basic_block_idx < 0: 
@@ -1031,7 +1087,8 @@ class ExecutionEngine:
                             else:
                                 direction = directions[k]
                                 k += 1
-                                basic_block = cfgs_by_module[module_name][complete_single_cycle_path.index(cfg_path)].basic_block_list[basic_block_idx]
+                                basic_block = cfgs_by_module[module_name][cfg_idx].basic_block_list[basic_block_idx]
+                                #basic_block = cfgs_by_module[module_name][complete_single_cycle_path.index(cfg_path)].basic_block_list[basic_block_idx]
                                 for stmt in basic_block:
                                     # print(f"updating curr mod {manager.curr_module}")
                                     #self.check_state(manager, state)
