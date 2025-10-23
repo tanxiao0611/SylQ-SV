@@ -23,59 +23,61 @@ from pyslang import ConditionalStatementSyntax, DataDeclarationSyntax
 
 class CFG:
     """CFG of Verilog RTL."""
-    # basic blocks. A list made up of slices of all_nodes determined by partition_points.
-    basic_block_list = []
+    def __init__(self):
+        # basic blocks. A list made up of slices of all_nodes determined by partition_points.
+        self.basic_block_list = []
 
-    # for partitioning
-    curr_idx = 0
+        # for partitioning
+        self.curr_idx = 0
 
-    # add all nodes in the always block
-    all_nodes = []
+        # add all nodes in the always block
+        self.all_nodes = []
 
-    # partition indices
-    partition_points = set()
-    partition_points.add(0)
+        # partition indices
+        self.partition_points = set()
+        self.partition_points.add(0)
 
-    # the edgelist will be a list of tuples of indices of the ast nodes blocks
-    edgelist = []
+        # the edgelist will be a list of tuples of indices of the ast nodes blocks
+        self.edgelist = []
 
-    # edges between basic blocks, determined by the above edgelist
-    cfg_edges = []
+        # edges between basic blocks, determined by the above edgelist
+        self.cfg_edges = []
 
-    # indices of basic blocks that need to connect to dummy exit node
-    leaves = set()
+        # indices of basic blocks that need to connect to dummy exit node
+        self.leaves = set()
 
-    #paths... list of paths with start and end being the dummy nodes
-    paths = []
+        #paths... list of paths with start and end being the dummy nodes
+        self.paths = []
 
-    # name corresponding to the module. there could be multiple always blocks (or CFGS) per module
-    module_name = ""
+        # name corresponding to the module. there could be multiple always blocks (or CFGS) per module
+        self.module_name = ""
 
-    # Decl nodes outside the always block to be executed once up front for all paths
-    decls = []
+        # Decl nodes outside the always block to be executed once up front for all paths
+        self.decls = []
 
-    # Combinational logic nodes outside the always block to be twice for all paths
-    comb = []
+        # Combinational logic nodes outside the always block to be twice for all paths
+        self.comb = []
 
-    # the nodes in the AST that correspond to always blocks
-    always_blocks = []
+        # the nodes in the AST that correspond to always blocks
+        self.always_blocks = []
 
-    # branch-point set
-    # for each basic statement, there may be some indpendent branching points
-    ind_branch_points = {1: set()}
+        # branch-point set
+        # for each basic statement, there may be some indpendent branching points
+        self.ind_branch_points = {1: set()}
 
-    # stack of flags for if we are looking at a block statement
-    block_smt = [False]
+        # stack of flags for if we are looking at a block statement
+        self.block_smt = [False]
 
-    # how many nested block statements we've seen so far
-    block_stmt_depth = 0
+        # how many nested block statements we've seen so far
+        self.block_stmt_depth = 0
 
-    #submodules defined
-    submodules = []
+        #submodules defined
+        self.submodules = []
 
     def reset(self):
         """Return to defaults."""
-        self.basic_block_list = []
+        self.__init__()
+        """self.basic_block_list = []
         self.curr_idx = 0
         self.all_nodes = []
         self.partition_points = set()
@@ -87,7 +89,7 @@ class CFG:
         self.always_blocks = []
         self.ind_branch_points = {1: set()}
         self.block_smt = [False]
-        self.block_stmt_depth = 0
+        self.block_stmt_depth = 0"""
 
     def compute_direction(self, path):
         """Given a path, figure out the direction"""
@@ -141,14 +143,21 @@ class CFG:
                     if isinstance(ast, ps.ModuleDeclarationSyntax):
                         self.get_always_sv(m, s, ast.members)
                     if isinstance(ast, ps.ConditionalStatementSyntax):
-                        self.get_always(m, s, ast.ifTrue) 
-                        self.get_always(m, s, ast.ifFalse)
+                        #self.get_always(m, s, ast.ifTrue) 
+                        #self.get_always(m, s, ast.ifFalse)
+                        then_body = getattr(ast, "ifTrue", getattr(ast, "statement", None))
+                        else_clause = getattr(ast, "elseClause", None)
+                        else_body = getattr(else_clause, "statement", None) if else_clause is not None else None
+                        self.get_always_sv(m, s, then_body)
+                        self.get_always_sv(m, s, else_body)
                     elif isinstance(ast, ps.CaseStatementSyntax):
                         self.get_always(m, s, ast.caseStatements)
                     elif isinstance(ast, ps.ForLoopStatementSyntax):
-                        self.get_always(m, s, ast.body)
+                        #self.get_always(m, s, ast.body)
+                        self.get_always_sv(m, s, ast.statement)
                     elif isinstance(ast, ps.BlockStatementSyntax):
-                        self.get_always(m, s, ast.statements)
+                        #self.get_always(m, s, ast.statements)
+                        self.get_always_sv(m, s, ast.items)
                     elif isinstance(ast, ps.ProceduralBlockSyntax):
                         #print("found procedural/always block")
                         self.always_blocks.append(ast)          
@@ -176,7 +185,12 @@ class CFG:
                 self.get_always(m, s, ast.ifTrue) 
                 self.get_always(m, s, ast.ifFalse)
             elif isinstance(ast, ps.CaseStatementSyntax):
-                self.get_always(m, s, ast.caseStatements)
+                #self.get_always(m, s, ast.caseStatements)
+                self.get_always_sv(m, s, ast.items)
+            elif isinstance(ast, ps.CaseItemSyntax):
+                body = getattr(ast, "statements", getattr(ast, "statement", None))
+                self.get_always_sv(m, s, body)
+
             elif isinstance(ast, ps.ForLoopStatementSyntax):
                 self.get_always(m, s, ast.body)
             elif isinstance(ast, ps.BlockStatementSyntax):
@@ -269,22 +283,39 @@ class CFG:
                     self.all_nodes.append(item)
                     self.partition_points.add(self.curr_idx)
                     parent_idx = self.curr_idx
-                    self.basic_blocks(m, s, item.true_statement) 
+
+                    then_body = getattr(item, "ifTrue", getattr(item, "statement", None))
+                    else_clause = getattr(item, "elseClause", None)
+                    else_body = getattr(else_clause, "statement", None) if else_clause is not None else None
+
+                    #self.basic_blocks(m, s, item.true_statement)
+                    self.basic_blocks_sv(m, s, then_body)
                     edge_1 = (parent_idx, self.curr_idx)
                     self.partition_points.add(self.curr_idx)
-                    self.basic_blocks(m, s, item.false_statement)
+
+                    #self.basic_blocks(m, s, item.false_statement)
+                    self.basic_blocks_sv(m, s, else_body)
                     edge_2 = (parent_idx, self.curr_idx)
                     self.partition_points.add(self.curr_idx)
                     self.curr_idx += 1
                     self.edgelist.append(edge_1)
                     self.edgelist.append(edge_2)
+                
                 elif isinstance(item, ps.CaseStatementSyntax):
-                    self.all_nodes.append(ast)
+                    #self.all_nodes.append(ast)
+                    self.all_nodes.append(item)
                     self.partition_points.add(self.curr_idx)
                     self.curr_idx += 1
-                    self.basic_blocks_sv(m, s, item.caselist) 
+                    #self.basic_blocks_sv(m, s, item.caselist) 
+                    self.basic_blocks_sv(m, s, item.items)
+                elif isinstance(item, ps.CaseItemSyntax):
+                    body = getattr(item, "statements", getattr(item, "statement", None))
+                    self.basic_blocks_sv(m, s, body)
+
+
                 elif isinstance(item, ps.ForLoopStatementSyntax):
-                    self.all_nodes.append(ast)
+                    self.all_nodes.append(item)
+                    #self.all_nodes.append(ast)
                     self.partition_points.add(self.curr_idx)
                     self.curr_idx += 1
                     self.basic_blocks_sv(m, s, item.statement) 
@@ -308,19 +339,32 @@ class CFG:
                 self.all_nodes.append(ast)
                 parent_idx = self.curr_idx
                 self.curr_idx += 1
+
+                then_body = getattr(ast, "ifTrue", getattr(ast, "statement", None))
+                else_clause = getattr(ast, "elseClause", None)
+                else_body = getattr(else_clause, "statement", None) if else_clause is not None else None
+
                 edge_1 = (parent_idx, self.curr_idx)
                 self.partition_points.add(self.curr_idx)
-                self.basic_blocks(m, s, ast.true_statement) 
+
+                #self.basic_blocks(m, s, ast.true_statement) 
+                self.basic_blocks_sv(m, s, then_body)
+
                 edge_2 = (parent_idx, self.curr_idx)
                 self.partition_points.add(self.curr_idx)
-                self.basic_blocks(m, s, ast.false_statement)
+                #self.basic_blocks(m, s, ast.false_statement)
+                self.basic_blocks_sv(m, s, else_body)
                 self.edgelist.append(edge_1)
                 self.edgelist.append(edge_2)
             elif isinstance(ast, ps.CaseStatementSyntax):
                 self.all_nodes.append(ast)
                 self.partition_points.add(self.curr_idx)
                 self.curr_idx += 1
-                self.basic_blocks_sv(m, s, ast.caselist)
+                #self.basic_blocks_sv(m, s, ast.caselist)
+                self.basic_blocks_sv(m, s, ast.items)
+            elif isinstance(ast, ps.CaseItemSyntax):
+                body = getattr(ast, "statements", getattr(ast, "statement", None))
+                self.basic_blocks_sv(m, s, body)
             elif isinstance(ast, ps.ForLoopStatementSyntax):
                 self.all_nodes.append(ast)
                 self.partition_points.add(self.curr_idx)
@@ -330,7 +374,8 @@ class CFG:
                 self.block_stmt_depth += 1
                 self.block_smt.append(True)
                 #print("found other block statement")
-                self.basic_blocks(m, s, ast.statements)
+                #self.basic_blocks(m, s, ast.statements)
+                self.basic_blocks_sv(m, s, ast.items)
                 if self.block_stmt_depth in self.ind_branch_points:
                     self.resolve_independent_branch_pts(self.block_stmt_depth)
                 self.block_smt.pop()
