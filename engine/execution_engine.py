@@ -906,7 +906,9 @@ class ExecutionEngine:
             manager.reg_writes.clear()
             for name in manager.names_list:
                 state.store[name] = {}
-
+            manager.path_count += 1
+        print(f"Branch points explored: {manager.branch_count}")
+        print(f"Paths explored: {manager.path_count}")
         self.module_depth -= 1
 
     #@profile     

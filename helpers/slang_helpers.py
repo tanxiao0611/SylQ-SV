@@ -667,7 +667,7 @@ class SymbolicDFS:
         elif kind == ps.StatementKind.Conditional:
             cond_expr = stmt.conditions[0].expr if stmt.conditions else None
             if cond_expr:
-                m.branch_points += 1
+                m.branch_count += 1
                 self.visit_expr(m, s, cond_expr)
                 s.pc.push()
                 s.assertion_counter += 1
@@ -709,7 +709,7 @@ class SymbolicDFS:
             for s_sub in stmt.body:
                 self.visit_stmt(m, s, s_sub, modules, direction)
 
-        elif kind == ps.StatementKind.Loop:
+        elif kind == ps.StatementKind.ForLoop:
             if hasattr(stmt, "init"):
                 self.visit_stmt(m, s, stmt.init, modules, direction)
             if hasattr(stmt, "cond"):
@@ -719,8 +719,8 @@ class SymbolicDFS:
             if hasattr(stmt, "incr"):
                 self.visit_stmt(m, s, stmt.incr, modules, direction)
 
-        elif kind == ps.StatementKind.While:
-            m.branch_points += 1
+        elif kind == ps.StatementKind.WhileLoop:
+            m.branch_count += 1
             if hasattr(stmt, "cond"):
                 self.visit_expr(m, s, stmt.cond)
                 s.pc.push()
@@ -755,15 +755,15 @@ class SymbolicDFS:
             if hasattr(stmt, "cond"):
                 s.pc.pop()
 
-        elif kind == ps.StatementKind.DoWhile:
-            m.branch_points += 1
+        elif kind == ps.StatementKind.DoWhileLoop:
+            m.branch_count += 1
             if hasattr(stmt, "body"):
                 self.visit_stmt(m, s, stmt.body, modules, direction)
             if hasattr(stmt, "cond"):
                 self.visit_expr(m, s, stmt.cond)
 
         elif kind == ps.StatementKind.Case:
-            m.branch_points += 1
+            m.branch_count += 1
             self.visit_expr(m, s, stmt.expr)
             for case in stmt.cases:
                 for e in case.exprs:
@@ -798,7 +798,7 @@ class SymbolicDFS:
                     self.visit_stmt(m, s, case.stmt, modules, direction)
                     s.pc.pop()
 
-        elif kind in [ps.StatementKind.Assign, ps.StatementKind.NonBlockingAssign]:
+        elif kind in [ps.StatementKind.ProceduralAssign]:
             self.visit_expr(m, s, stmt.left)
             self.visit_expr(m, s, stmt.right)
             if hasattr(stmt.left, 'symbol') and hasattr(stmt.right, 'symbol'):
@@ -809,28 +809,24 @@ class SymbolicDFS:
                 lhs = stmt.left.symbol.name
                 s.store[m.curr_module][lhs] = init_symbol()
 
-        elif kind == ps.StatementKind.ProcedureCall:
-            self.visit_expr(m, s, stmt.expr)
+        # elif kind == ps.StatementKind.ProcedureCall:
+        #     self.visit_expr(m, s, stmt.expr)
 
-        elif kind in [ps.StatementKind.Initial, ps.StatementKind.Always,
-                    ps.StatementKind.ParallelBlock, ps.StatementKind.SequentialBlock,
-                    ps.StatementKind.TimingControl]:
+        elif kind in [ps.StatementKind.Block,
+                    ps.StatementKind.Timed]:
             self.visit_stmt(m, s, stmt.body, modules, direction)
 
-        elif kind in [ps.StatementKind.Assert, ps.StatementKind.Assume, ps.StatementKind.Cover]:
-            self.visit_expr(m, s, stmt.expr)
-            self.visit_stmt(m, s, stmt.body, modules, direction)
-            if hasattr(stmt, "elseBody"):
-                self.visit_stmt(m, s, stmt.elseBody, modules, direction)
+        # elif kind in [ps.StatementKind.Assert, ps.StatementKind.Assume, ps.StatementKind.Cover]:
+        #     self.visit_expr(m, s, stmt.expr)
+        #     self.visit_stmt(m, s, stmt.body, modules, direction)
+        #     if hasattr(stmt, "elseBody"):
+        #         self.visit_stmt(m, s, stmt.elseBody, modules, direction)
 
         elif kind == ps.StatementKind.Return and hasattr(stmt, "expr"):
             self.visit_expr(m, s, stmt.expr)
-
-        elif kind in [ps.StatementKind.Break, ps.StatementKind.Continue, ps.StatementKind.Empty,
-                    ps.StatementKind.Declaration, ps.StatementKind.DisableFork,
-                    ps.StatementKind.WaitFork, ps.StatementKind.EventTrigger,
-                    ps.StatementKind.Disable, ps.StatementKind.WaitOrder]:
-            pass  # No action needed
+        
+        elif kind == ps.StatementKind.ExpressionStatement:
+            self.visit_expr(m, s, stmt.expr)
 
 class ExpressionSymbolCollector:
     """Visitor that traverses an expression and collects parameter and port symbols."""
