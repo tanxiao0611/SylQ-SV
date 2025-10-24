@@ -778,9 +778,18 @@ class ExecutionEngine:
             single_paths_by_module[module_name] = list(product(*mapped_paths[module_name].values()))
             total_paths_by_module[module_name] = list(tuple(product(single_paths_by_module[module_name], repeat=int(num_cycles))))
         # {total_paths_by_module}")
-        keys, values = zip(*total_paths_by_module.items())
-        total_paths = [dict(zip(keys, path)) for path in product(*values)]
-        print(f"Total paths: {total_paths}")
+        print(f"single paths by module: {total_paths_by_module}")
+        if not total_paths_by_module:
+            total_paths = []
+        else:
+            keys = list(total_paths_by_module.keys())
+            values = []
+            for key in keys:
+                module_paths = total_paths_by_module[key]
+                if not module_paths:
+                    module_paths = [tuple(() for _ in range(int(num_cycles)))]
+                values.append(module_paths)
+            total_paths = [dict(zip(keys, path_combo)) for path_combo in product(*values)]
         
         #single_paths = list(product(*mapped_paths[manager.curr_module].values()))
         #total_paths = list(tuple(product(single_paths, repeat=int(num_cycles))))
@@ -842,7 +851,8 @@ class ExecutionEngine:
                                 for stmt in basic_block:
                                     # print(f"updating curr mod {manager.curr_module}")
                                     #self.check_state(manager, state)
-                                    self.search_strategy.visit_stmt(manager, state, stmt, modules_dict, direction)
+                                    visitor.visit_stmt(manager, state, stmt, modules_dict, direction)
+                                    #self.search_strategy.visit_stmt(manager, state, stmt, modules_dict, direction)
                     # only do once, and the last CFG 
                     #for node in cfgs_by_module[module_name][complete_single_cycle_path.index(cfg_path)].comb:
                         #self.search_strategy.visit_stmt(manager, state, node, modules_dict, None)  

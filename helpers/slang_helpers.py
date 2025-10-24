@@ -65,6 +65,7 @@ class SlangSymbolVisitor:
         self.paths = 0
     
     def visit_stmt(self, stmt):
+        print("visiting stmt!")
         if stmt is None:
             self.paths += 1
             return
