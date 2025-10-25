@@ -113,36 +113,41 @@ class CFG:
 
     def get_always_sv(self, m: ExecutionManager, s: SymbolicState, ast):
         """Populate the always block list for a SV design."""
-        if ast.__class__.__name__ == "ProceduralBlockSyntax":
-            print("hey")
-            ast = ast.members
+        #if ast.__class__.__name__ == "ProceduralBlockSyntax":
+            #print("hey")
+            #ast = ast.members
+
+        if (ast != None and isinstance(ast, ps.DefinitionSymbol)):
+                #print("10")
+                self.get_always_sv(m, s, ast.syntax)
+                return
+
+        if isinstance(ast, ps.ModuleDeclarationSyntax):
+            for mem in ast.members:
+                self.get_always_sv(m, s, mem)
+            return
 
         if hasattr(ast, '__iter__'):
-            for item in ast:
-                #print(f"item ! {item.kind} {dir(item)}")
-                # print(f"kind of item !! {item.kind}")
-                # print((item.__class__.__name__))
-                if ast.__class__.__name__ == "ConditionalStatementSyntax":
-                    print("found if statement")
-                    print(dir(item))
-                    self.get_always_sv(m, s, item.statement) 
-                    self.get_always_sv(m, s, item.elseClause)
-                elif ast.__class__.__name__ == "CaseStatementSyntax":
-                    return self.get_always_sv(m, s, item.items) 
-                elif item.__class__.__name__ == "ForLoopStatementSyntax":
-                    return self.get_always_sv(m, s, item.statement) 
-                elif item.__class__.__name__ == "ProceduralBlockSyntax":
-                    self.always_blocks.append(item)   
-                elif item.__class__.__name__ == "BlockStatementSyntax":
-                    self.get_always_sv(m, s, item.items)    
-                # elif isinstance(item, Initial):
-                #     self.get_always(m, s, item.statement)
-                # elif isinstance(item, SingleStatement):
-                #     self.get_always(m, s, item.statement)
-                else:
-                    if isinstance(ast, ps.ModuleDeclarationSyntax):
-                        self.get_always_sv(m, s, ast.members)
+            #print(ast.__class__.__name__)
+            if ast.__class__.__name__ == "ProceduralBlockSyntax":
+                #print("procedural")
+                self.always_blocks.append(ast)
+            elif ast.__class__.__name__ == "ConditionalStatementSyntax":
+                    #print("found if statement")
+                    print(dir(ast))
+                    self.get_always_sv(m, s, ast.statement) 
+                    self.get_always_sv(m, s, ast.elseClause)
+            elif ast.__class__.__name__ == "CaseStatementSyntax":
+                    return self.get_always_sv(m, s, ast.items)
+                    self.get_always_sv(m, s, ast.items)
+            elif ast.__class__.__name__ == "ForLoopStatementSyntax":
+                    return self.get_always_sv(m, s, ast.statement)
+                    self.get_always_sv(m, s, ast.statement)
+            elif ast.__class__.__name__ == "BlockStatementSyntax":
+                    self.get_always_sv(m, s, ast.items)
+            else:
                     if isinstance(ast, ps.ConditionalStatementSyntax):
+                        #print("2")
                         #self.get_always(m, s, ast.ifTrue) 
                         #self.get_always(m, s, ast.ifFalse)
                         then_body = getattr(ast, "ifTrue", getattr(ast, "statement", None))
@@ -151,24 +156,154 @@ class CFG:
                         self.get_always_sv(m, s, then_body)
                         self.get_always_sv(m, s, else_body)
                     elif isinstance(ast, ps.CaseStatementSyntax):
+                        #print("3")
                         self.get_always(m, s, ast.caseStatements)
                     elif isinstance(ast, ps.ForLoopStatementSyntax):
+                        #print("4")
                         #self.get_always(m, s, ast.body)
                         self.get_always_sv(m, s, ast.statement)
                     elif isinstance(ast, ps.BlockStatementSyntax):
+                        #print("5")
                         #self.get_always(m, s, ast.statements)
                         self.get_always_sv(m, s, ast.items)
                     elif isinstance(ast, ps.ProceduralBlockSyntax):
+                        #print("6")
                         #print("found procedural/always block")
-                        self.always_blocks.append(ast)          
+                        self.always_blocks.append(ast)
                     # elif isinstance(ast, ps.InitialConstructSyntax):
                     #     self.get_always(m, s, ast.statement)
                     elif isinstance(ast, ps.StatementSyntax):
+                        #print("7")
                         self.get_always_sv(m, s, ast.statement)
                     else:
                         if isinstance(ast, ps.DataDeclarationSyntax):
+                            #print("8")
                             self.decls.append(ast)
                         elif isinstance(ast, ps.ContinuousAssignSyntax):
+                            #print("9")
+                            self.comb.append(ast)
+                    ...
+        elif ast != None:
+            # print(f"ast ! {ast.definitionKind} {dir(ast)}")
+            # print(type(ps.DefinitionSymbol))
+            # print(type(ast) == type(ps.DefinitionSymbol))
+            # print(type(ast))
+            if isinstance(ast, ps.ConditionalStatementSyntax):
+                #print("11")
+                self.get_always(m, s, ast.ifTrue) 
+                self.get_always(m, s, ast.ifFalse)
+            elif isinstance(ast, ps.CaseStatementSyntax):
+                #print("12")
+                #self.get_always(m, s, ast.caseStatements)
+                self.get_always_sv(m, s, ast.items)
+            elif isinstance(ast, ps.CaseItemSyntax):
+                #print("13")
+                body = getattr(ast, "statements", getattr(ast, "statement", None))
+                self.get_always_sv(m, s, body)
+            elif isinstance(ast, ps.ForLoopStatementSyntax):
+                #print("14")
+                self.get_always(m, s, ast.body)
+            elif isinstance(ast, ps.BlockStatementSyntax):
+                #print("15")
+                self.get_always(m, s, ast.statements)
+            elif isinstance(ast, ps.ProceduralBlockSyntax):
+                #print("16")
+                self.always_blocks.append(ast)          
+            # elif isinstance(ast, ps.InitialConstructSyntax):
+            #     self.get_always(m, s, ast.statement)
+            elif isinstance(ast, ps.StatementSyntax):
+                #print("17")
+                self.get_always(m, s, ast.statement)
+            else:
+                #print("18")
+                if isinstance(ast, ps.DataDeclarationSyntax):
+                    self.decls.append(ast)
+                elif isinstance(ast, ps.ContinuousAssignSyntax):
+                    self.comb.append(ast)
+                # elif isinstance(ast, ps.HierarchicalReference):
+                #     print("FOUND SUBModule!")
+                ...
+
+
+        """
+        if hasattr(ast, '__iter__'):
+            for item in ast:
+
+                #TODO
+                #There's 28 procedual blocks counted, but there's only 11 always block in or1200-alu.v
+
+                #print(item)
+                #print(f"item ! {item.kind} {dir(item)}")
+                # print(f"kind of item !! {item.kind}")
+                #print((item.__class__.__name__))
+                
+                #if ast.__class__.__name__ == "ConditionalStatementSyntax":
+                if item.__class__.__name__ == "ConditionalStatementSyntax":
+                    print("found if statement")
+                    #never enter
+                    print(dir(item))
+                    self.get_always_sv(m, s, item.statement) 
+                    self.get_always_sv(m, s, item.elseClause)
+                #elif ast.__class__.__name__ == "CaseStatementSyntax":
+                elif item.__class__.__name__ == "CaseStatementSyntax":
+                    #return self.get_always_sv(m, s, item.items)
+                    #never enter
+                    self.get_always_sv(m, s, item.items)
+                elif item.__class__.__name__ == "ForLoopStatementSyntax":
+                    #return self.get_always_sv(m, s, item.statement)
+                    #never enter
+                    self.get_always_sv(m, s, item.statement)
+                elif item.__class__.__name__ == "ProceduralBlockSyntax":
+                    print("procedural")
+                    #TODO: here prints 28 procedural blocks -> num of always block
+                    self.always_blocks.append(item)
+                elif item.__class__.__name__ == "BlockStatementSyntax":
+                    #never enter
+                    self.get_always_sv(m, s, item.items)
+                # elif isinstance(item, Initial):
+                #     self.get_always(m, s, item.statement)
+                # elif isinstance(item, SingleStatement):
+                #     self.get_always(m, s, item.statement)
+                else:
+                    #only enters "1" 4 times
+                    if isinstance(ast, ps.ModuleDeclarationSyntax):
+                        print("1")
+                        self.get_always_sv(m, s, ast.members)
+                    if isinstance(ast, ps.ConditionalStatementSyntax):
+                        print("2")
+                        #self.get_always(m, s, ast.ifTrue) 
+                        #self.get_always(m, s, ast.ifFalse)
+                        then_body = getattr(ast, "ifTrue", getattr(ast, "statement", None))
+                        else_clause = getattr(ast, "elseClause", None)
+                        else_body = getattr(else_clause, "statement", None) if else_clause is not None else None
+                        self.get_always_sv(m, s, then_body)
+                        self.get_always_sv(m, s, else_body)
+                    elif isinstance(ast, ps.CaseStatementSyntax):
+                        print("3")
+                        self.get_always(m, s, ast.caseStatements)
+                    elif isinstance(ast, ps.ForLoopStatementSyntax):
+                        print("4")
+                        #self.get_always(m, s, ast.body)
+                        self.get_always_sv(m, s, ast.statement)
+                    elif isinstance(ast, ps.BlockStatementSyntax):
+                        print("5")
+                        #self.get_always(m, s, ast.statements)
+                        self.get_always_sv(m, s, ast.items)
+                    elif isinstance(ast, ps.ProceduralBlockSyntax):
+                        print("6")
+                        #print("found procedural/always block")
+                        self.always_blocks.append(ast)
+                    # elif isinstance(ast, ps.InitialConstructSyntax):
+                    #     self.get_always(m, s, ast.statement)
+                    elif isinstance(ast, ps.StatementSyntax):
+                        print("7")
+                        self.get_always_sv(m, s, ast.statement)
+                    else:
+                        if isinstance(ast, ps.DataDeclarationSyntax):
+                            print("8")
+                            self.decls.append(ast)
+                        elif isinstance(ast, ps.ContinuousAssignSyntax):
+                            print("9")
                             self.comb.append(ast)
                     ...
         elif ast != None:
@@ -180,28 +315,37 @@ class CFG:
             #     # TODO: This is not working anymore
                 # print("module kind")
                 # print(dir(ast))
+                print("10")
                 self.get_always_sv(m, s, ast.syntax)
             if isinstance(ast, ps.ConditionalStatementSyntax):
+                print("11")
                 self.get_always(m, s, ast.ifTrue) 
                 self.get_always(m, s, ast.ifFalse)
             elif isinstance(ast, ps.CaseStatementSyntax):
+                print("12")
                 #self.get_always(m, s, ast.caseStatements)
                 self.get_always_sv(m, s, ast.items)
             elif isinstance(ast, ps.CaseItemSyntax):
+                print("13")
                 body = getattr(ast, "statements", getattr(ast, "statement", None))
                 self.get_always_sv(m, s, body)
 
             elif isinstance(ast, ps.ForLoopStatementSyntax):
+                print("14")
                 self.get_always(m, s, ast.body)
             elif isinstance(ast, ps.BlockStatementSyntax):
+                print("15")
                 self.get_always(m, s, ast.statements)
             elif isinstance(ast, ps.ProceduralBlockSyntax):
+                print("16")
                 self.always_blocks.append(ast)          
             # elif isinstance(ast, ps.InitialConstructSyntax):
             #     self.get_always(m, s, ast.statement)
             elif isinstance(ast, ps.StatementSyntax):
+                print("17")
                 self.get_always(m, s, ast.statement)
             else:
+                print("18")
                 if isinstance(ast, ps.DataDeclarationSyntax):
                     self.decls.append(ast)
                 elif isinstance(ast, ps.ContinuousAssignSyntax):
@@ -209,7 +353,7 @@ class CFG:
                 # elif isinstance(ast, ps.HierarchicalReference):
                 #     print("FOUND SUBModule!")
                 ...
-
+    """
     def get_always(self, m: ExecutionManager, s: SymbolicState, ast):
         """Populate the always block list."""
         if isinstance(ast, Block):
