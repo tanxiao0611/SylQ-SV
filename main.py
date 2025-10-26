@@ -23,6 +23,8 @@ import redis
 import threading
 import time
 
+from helpers.rvalue_to_z3 import parse_expr_to_Z3
+
 gc.collect()
 
 with open('errors.log', 'w'):
@@ -131,14 +133,17 @@ def main():
 
         #TODO
         #IF using pyslang 7.0, uncomment the followingl line and comment out the other successful_compilation
-        #successful_compilation = driver.reportCompilation(compilation, False)
+        successful_compilation = driver.reportCompilation(compilation, False)
 
         #IF using pyslang 9.0/9.1, use this version of successful_compilation
-        successful_compilation = driver.runFullCompilation(False)
+        #successful_compilation = driver.runFullCompilation(False)
         
         if successful_compilation:
             #print(driver.reportMacros())
             my_visitor_for_symbol = SymbolicDFS(num_cycles)
+            #delegate method from z3Visitor
+            my_visitor_for_symbol.expr_to_z3 = lambda m, s, e: parse_expr_to_Z3(e, s, m)
+
             symbol_visitor = SlangSymbolVisitor(num_cycles)
             engine.execute_sv(my_visitor_for_symbol, modules, None, num_cycles)
             symbol_visitor.visit(modules)

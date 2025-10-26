@@ -573,6 +573,7 @@ class SymbolicDFS:
                 self.dfs_stmt(s)
 
     def visit_expr(self, m: ExecutionManager, s: SymbolicState, expr):
+        print(expr.__class__.__name__, dir(expr))
         if expr is None:
             return
 
@@ -596,8 +597,9 @@ class SymbolicDFS:
         elif kind == ps.ExpressionKind.Assignment:
             self.visit_expr(m, s, expr.left)
             self.visit_expr(m, s, expr.right)
-
-        elif kind in [ps.ExpressionKind.Concatenation, ps.ExpressionKind.StreamingConcatenation]:
+        
+        #elif kind in [ps.ExpressionKind.Concatenation, ps.ExpressionKind.StreamingConcatenation]:
+        elif expr.__class__.__name__ in ["ConcatenationExpressionSyntax", "StreamingConcatenationExpressionSyntax"]:
             for e in expr.operands:
                 self.visit_expr(m, s, e)
 
@@ -614,20 +616,24 @@ class SymbolicDFS:
             self.visit_expr(m, s, expr.left)
             self.visit_expr(m, s, expr.right)
 
-        elif kind in [ps.ExpressionKind.MemberAccess, ps.ExpressionKind.Streaming,
-                    ps.ExpressionKind.Replication, ps.ExpressionKind.TaggedUnion,
-                    ps.ExpressionKind.Cast, ps.ExpressionKind.SignedCast,
-                    ps.ExpressionKind.UnsignedCast, ps.ExpressionKind.CopyClass,
-                    ps.ExpressionKind.StreamExpression, ps.ExpressionKind.StreamExpressionWithRange,
-                    ps.ExpressionKind.Parenthesized]:
+        #elif kind in [ps.ExpressionKind.MemberAccess, ps.ExpressionKind.Streaming,
+                    #ps.ExpressionKind.Replication, ps.ExpressionKind.TaggedUnion,
+                    #ps.ExpressionKind.Cast, ps.ExpressionKind.SignedCast,
+                    #ps.ExpressionKind.UnsignedCast, ps.ExpressionKind.CopyClass,
+                    #ps.ExpressionKind.StreamExpression, ps.ExpressionKind.StreamExpressionWithRange,
+                    #ps.ExpressionKind.Parenthesized]:
+        elif expr.__class__.__name__ in ["MemberAccessExpressionSyntax", "StreamingExpressionSyntax", "ReplicationExpressionSyntax", "TaggedUnionExpressionSyntax", "CastExpressionSyntax", "SignedCastExpressionSyntax", "UnsignedCastExpressionSyntax", "CopyClassExpressionSyntax", "StreamExpressionSyntax", "StreamExpressionWithRangeSyntax", "ParenthesizedExpressionSyntax"]:
+
             self.visit_expr(m, s, expr.value)
 
-        elif kind in [ps.ExpressionKind.SimpleAssignmentPattern, ps.ExpressionKind.List,
-                    ps.ExpressionKind.Pattern]:
+        #elif kind in [ps.ExpressionKind.SimpleAssignmentPattern, ps.ExpressionKind.List,
+                    #ps.ExpressionKind.Pattern]:
+        elif expr.__class__.__name__ in ["SimpleAssignmentPatternExpressionSyntax", "ListExpressionSyntax", "PatternExpressionSyntax"]:
             for e in expr.elements:
                 self.visit_expr(m, s, e)
 
-        elif kind in [ps.ExpressionKind.StructuredAssignmentPattern, ps.ExpressionKind.StructurePattern]:
+        #elif kind in [ps.ExpressionKind.StructuredAssignmentPattern, ps.ExpressionKind.StructurePattern]:
+        elif expr.__class__.__name__ in ["StructuredAssignmentPatternExpressionSyntax", "StructurePatternExpressionSyntax"]:
             for e in expr.elements:
                 self.visit_expr(m, s, e.value)
 
@@ -642,16 +648,19 @@ class SymbolicDFS:
             self.visit_expr(m, s, expr.max)
 
         # Ignore literals and null
-        elif kind in [ps.ExpressionKind.IntegerLiteral, ps.ExpressionKind.RealLiteral,
-                    ps.ExpressionKind.TimeLiteral, ps.ExpressionKind.NullLiteral,
-                    ps.ExpressionKind.StringLiteral, ps.ExpressionKind.UnbasedUnsizedLiteral]:
+        #elif kind in [ps.ExpressionKind.IntegerLiteral, ps.ExpressionKind.RealLiteral,
+                    #ps.ExpressionKind.TimeLiteral, ps.ExpressionKind.NullLiteral,
+                    #ps.ExpressionKind.StringLiteral, ps.ExpressionKind.UnbasedUnsizedLiteral]:
+        elif expr.__class__.__name__ in ["IntegerLiteralExpressionSyntax", "RealLiteralExpressionSyntax", "TimeLiteralExpressionSyntax", "NullLiteralExpressionSyntax", "StringLiteralExpressionSyntax", "UnbasedUnsizedLiteralExpressionSyntax"]:
             pass
 
-        elif kind == ps.ExpressionKind.Unknown:
+        #elif kind == ps.ExpressionKind.Unknown:
+        elif expr.__class__.__name__ == "UnknownExpressionSyntax":
             pass
 
 
     def visit_stmt(self, m: ExecutionManager, s: SymbolicState, stmt, modules=None, direction=None):
+        print("visit:", stmt.__class__.__name__, getattr(getattr(stmt, "kind", None), "name", getattr(stmt, "kind", None)))
         if stmt is None or m.ignore:
             return
 
@@ -665,6 +674,7 @@ class SymbolicDFS:
                 self.visit_stmt(m, s, substmt, modules, direction)
 
         elif kind == ps.StatementKind.Conditional:
+            print("conditional")
             cond_expr = stmt.conditions[0].expr if stmt.conditions else None
             if cond_expr:
                 m.branch_count += 1
@@ -706,6 +716,7 @@ class SymbolicDFS:
                 s.pc.pop()
 
         elif kind == ps.StatementKind.List:
+            
             for s_sub in stmt.body:
                 self.visit_stmt(m, s, s_sub, modules, direction)
 
@@ -720,6 +731,7 @@ class SymbolicDFS:
                 self.visit_stmt(m, s, stmt.incr, modules, direction)
 
         elif kind == ps.StatementKind.WhileLoop:
+            print("whileloop")
             m.branch_count += 1
             if hasattr(stmt, "cond"):
                 self.visit_expr(m, s, stmt.cond)
@@ -756,17 +768,26 @@ class SymbolicDFS:
                 s.pc.pop()
 
         elif kind == ps.StatementKind.DoWhileLoop:
+            print("dowhile")
             m.branch_count += 1
             if hasattr(stmt, "body"):
                 self.visit_stmt(m, s, stmt.body, modules, direction)
             if hasattr(stmt, "cond"):
                 self.visit_expr(m, s, stmt.cond)
 
-        elif kind == ps.StatementKind.Case:
+        #elif kind == ps.StatementKind.Case:
+        elif stmt.__class__.__name__ == "CaseStatementSyntax":
+            print("case")
             m.branch_count += 1
             self.visit_expr(m, s, stmt.expr)
-            for case in stmt.cases:
-                for e in case.exprs:
+
+            cond_z3 = self.expr_to_z3(m, s, stmt.expr)
+            
+            #for case in stmt.cases:
+            for case in getattr(stmt, "items", getattr(stmt, "case_items", [])):
+                exprs = getattr(case, "expressions", getattr(case, "exprs", []))
+                #for e in case.exprs:
+                for e in exprs:
                     self.visit_expr(m, s, e)
                     s.pc.push()
                     s.assertion_counter += 1

@@ -24,14 +24,16 @@ op_map = {"Plus": "+", "Minus": "-", "Power": "**", "Times": "*", "Divide": "/",
 
 def conjunction_with_pointers(rvalue, s: SymbolicState, m: ExecutionManager) -> str: 
     """Convert the compound rvalue into proper string representation with pointers taken into account."""
-    if isinstance(rvalue, ps.UnaryExpressionSyntax):
+    #if isinstance(rvalue, ps.UnaryExpressionSyntax):
+    if rvalue.__class__.__name__ in ("UnaryExpressionSyntax", "PrefixUnaryExpressionSyntax"):
         operator = str(rvalue.operator)
         if isinstance(rvalue.operand, ps.ElementSelectExpressionSyntax):
             new_right = f"({operator} {rvalue.operand.value}[{rvalue.operand.selector}])"
             return new_right
         else: 
             return f"({operator} {conjunction_with_pointers(rvalue.operand, s, m)})"
-    elif isinstance(rvalue, ps.RepeatExpressionSyntax):
+    #elif isinstance(rvalue, ps.RepeatExpressionSyntax):
+    elif rvalue.__class__.__name__ in ("RepeatExpressionSyntax", "RepeatedExpressionSyntax"):
         if isinstance(rvalue.count, ps.IntegerLiteralExpressionSyntax):
             times_int = int(rvalue.count.value)
         else:
@@ -142,13 +144,17 @@ def conjunction_with_pointers(rvalue, s: SymbolicState, m: ExecutionManager) -> 
             accumulate += str(conjunction_with_pointers(sub_item, s, m)) + " "
         accumulate = accumulate.rstrip()
         return accumulate + ")"
-    elif isinstance(rvalue, ps.RangeSelectExpressionSyntax):
+    #elif isinstance(rvalue, ps.RangeSelectExpressionSyntax):
+    elif rvalue.__class__.__name__ in ("RangeSelectExpressionSyntax", "RangeSelectSyntax", "PartSelectExpressionSyntax"):
         return f"{rvalue.value.name}[{rvalue.left}:{rvalue.right}]"
     elif isinstance(rvalue, ps.IdentifierNameSyntax):
-        return rvalue.name
-    elif isinstance(rvalue, ps.IntegerLiteralExpressionSyntax):
+        #return rvalue.name
+        return rvalue.identifier.valueText
+    #elif isinstance(rvalue, ps.IntegerLiteralExpressionSyntax):
+    elif rvalue.__class__.__name__ == "IntegerLiteralExpressionSyntax":
         return rvalue.value
-    elif isinstance(rvalue, ps.StringLiteralExpressionSyntax):
+    #elif isinstance(rvalue, ps.StringLiteralExpressionSyntax):
+    elif rvalue.__class__.__name__ == "StringLiteralExpressionSyntax":
         return rvalue.value
     else:
         return str(rvalue)

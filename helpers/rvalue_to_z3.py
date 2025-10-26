@@ -12,6 +12,13 @@ from z3 import And, Or, BitVec, BitVecVal, Not, ULT, UGT, Z3Exception, BitVecRef
 import networkx as nx
 import ast
 from copy import deepcopy
+#fix
+from z3 import is_and
+from z3 import is_app_of, Z3_OP_EXTRACT
+from z3 import is_eq
+from z3 import is_distinct
+from z3 import is_and
+
 
 BINARY_OPS = ("Plus", "Minus", "Power", "Times", "Divide", "Mod", "Sll", "Srl", "Sla", "Sra", "LessThan",
 "GreaterThan", "LessEq", "GreaterEq", "Eq", "NotEq", "Eql", "NotEql", "And", "Xor",
@@ -268,11 +275,13 @@ def parse_expr_to_Z3(e: ps.ExpressionSyntax, s: SymbolicState, m: ExecutionManag
     # print(s.pc)
     # s.pc.add(F)
     # print(s.pc)
-    if isinstance(e, And):
+    if is_and(e):
+    #if isinstance(e, And):
         lhs = parse_expr_to_Z3(e.left, s, m)
         rhs = parse_expr_to_Z3(e.right, s, m)
         return s.pc.add(lhs.assertions() and rhs.assertions())
-    elif isinstance(e, Partselect):
+    #elif isinstance(e, Partselect):
+    elif is_app_of(e, Z3_OP_EXTRACT):
         part_sel_expr = f"{e.var.name}[{e.msb}:{e.lsb}]"
         module_name = m.curr_module
         is_reg = e.var.name in m.reg_decls
@@ -287,20 +296,26 @@ def parse_expr_to_Z3(e: ps.ExpressionSyntax, s: SymbolicState, m: ExecutionManag
                 first_part = parts[0]
                 s.store[m.curr_module][part_sel_expr] = s.store[m.curr_module][first_part]
             return BitVec(s.store[module_name][part_sel_expr], 32)
-    elif isinstance(e, Identifier):
+    #elif isinstance(e, Identifier):
+    elif e.__class__.__name__ == "IdentifierNameSyntax":
         module_name = m.curr_module
-        is_reg = e.name in m.reg_decls
-        if not e.scope is None:
+        #is_reg = e.name in m.reg_decls
+        is_reg = e.identifier.valueText in m.reg_decls
+        #if not e.scope is None:
+        if hasattr(e, "identifier") and getattr(e.identifier, "valueText", None):
+        #TODO no symbol/scope attribute in IdentifierNameSyntax
             module_name = e.scope.labellist[0].name
         if s.store[module_name][e.name].isdigit():
             int_val = IntVal(int(s.store[module_name][e.name]))
             return Int2BV(int_val, 32)
         else:
             return BitVec(s.store[module_name][e.name], 32)
-    elif isinstance(e, Constant):
+    #elif isinstance(e, Constant):
+    elif e.__class__.__name__ == "IntegerLiteralExpressionSyntax":
         int_val = IntVal(e.value)
         return Int2BV(int_val, 32)
-    elif isinstance(e, Eq):
+    #elif isinstance(e, Eq):
+    elif is_eq(e):
         lhs = parse_expr_to_Z3(e.left, s, m)
         rhs = parse_expr_to_Z3(e.right, s, m)
         if m.branch:
@@ -308,7 +323,8 @@ def parse_expr_to_Z3(e: ps.ExpressionSyntax, s: SymbolicState, m: ExecutionManag
         else:
             s.pc.add(lhs != rhs)
         return (lhs == rhs)
-    elif isinstance(e, NotEql):
+    #elif isinstance(e, NotEql):
+    elif is_distinct(e):
         lhs = parse_expr_to_Z3(e.left, s, m)
         rhs = parse_expr_to_Z3(e.right, s, m)
         if m.branch:          
@@ -331,7 +347,8 @@ def parse_expr_to_Z3(e: ps.ExpressionSyntax, s: SymbolicState, m: ExecutionManag
                     s.pc.pop()
                     m.abandon = True
                     m.ignore = True
-    elif isinstance(e, Land):
+    #elif isinstance(e, Land):
+    elif is_and(e):
         lhs = parse_expr_to_Z3(e.left, s, m)
         rhs = parse_expr_to_Z3(e.right, s, m)
 

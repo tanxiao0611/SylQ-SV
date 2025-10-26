@@ -695,14 +695,19 @@ class ExecutionEngine:
                         cfgs_by_module[sv_module_name].append(cfg)
                         cfg.reset()
                         #print(cfg.paths)"""
+                    
+
+
                     print(f"Module {sv_module_name} single instance")
                     manager.names_list.append(sv_module_name)
                     modules_dict[sv_module_name] = module                 # store AST
+                    
 
                     # discover always blocks once
                     probe = CFG()
                     probe.get_always_sv(manager, state, module)
                     always_blocks_by_module[sv_module_name] = probe.always_blocks
+                    #print(probe.always_blocks)
 
                     # fresh CFG per always (SV walker)
                     cfgs_by_module[sv_module_name] = []
@@ -726,6 +731,11 @@ class ExecutionEngine:
 
             # have do do things piece wise
             manager.debug = self.debug
+
+
+
+
+            #NEVER ENTER THE FOLLOWING IF, IF-ELSE
             if total_paths > 100:
                 start = time.process_time()
                 self.piece_wise_execute(ast, manager, modules)
@@ -745,7 +755,14 @@ class ExecutionEngine:
             
             #print(total_paths)
 
-        print(f"Branch points explored: {manager.branch_count}")
+
+
+
+        print("Here")
+        print(f"Branch points explored: {manager.branch_count}")     #TODO
+
+
+
         if self.debug:
             manager.debug = True
         self.assertions_always_intersect(manager)
@@ -778,7 +795,7 @@ class ExecutionEngine:
             single_paths_by_module[module_name] = list(product(*mapped_paths[module_name].values()))
             total_paths_by_module[module_name] = list(tuple(product(single_paths_by_module[module_name], repeat=int(num_cycles))))
         # {total_paths_by_module}")
-        print(f"single paths by module: {total_paths_by_module}")
+        #print(f"single paths by module: {total_paths_by_module}")
         if not total_paths_by_module:
             total_paths = []
         else:
